@@ -5,7 +5,7 @@ import numpy as np
 
 from collections import deque
 
-def load_model(filename):
+def load_instance(filename):
     ip = gp.read(filename)
     return ip
 

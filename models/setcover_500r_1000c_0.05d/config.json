@@ -1,0 +1,1 @@
+{"variable_features": ["coef", "lp_sol", "lp_sol_is_at_lb", "lp_sol_is_at_ub"], "constraint_features": ["obj_cos_sim", "type", "bias", "lp_is_tight", "lp_dualsol", "lp_slack"], "edge_features": ["coef"], "num_prob_map": 2}
