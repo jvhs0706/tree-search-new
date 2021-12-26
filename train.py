@@ -133,10 +133,10 @@ if __name__ == '__main__':
         if training_mask[i]:
             loss.backward()
             optimizer.step()
-            print(f'Step {i} (train), loss {loss.item()}, tree_size {len(problems)}.')
+            print(f'Step {i} (train), loss {loss.item():.3f}, tree_size {len(problems)}.')
         else:
             model.train()
-            print(f'Step {i} (valid), loss {loss.item()}, tree_size {len(problems)}.')
+            print(f'Step {i} (valid), loss {loss.item():.3f}, tree_size {len(problems)}.')
             
     # summarize the history of loss and the tree size
     loss_hist, tree_size_hist = np.array(loss_hist), np.array(tree_size_hist)
