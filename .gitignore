@@ -1,4 +1,4 @@
-/data
 dummy.py
 __pycache__
-/models
+models/
+data/
