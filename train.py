@@ -85,20 +85,19 @@ if __name__ == '__main__':
     
     loss_hist, tree_size_hist = [], []
     train_best_map_hist, valid_best_map_hist = np.array([0] * args.num_prob_map), np.array([0] * args.num_prob_map)
-
+    
+    
     for i in range(args.num_training + args.num_validation):
         if training_mask[i]:
             idx = np.random.randint(num_training_instances)
-            optimizer.zero_grad()
-            loss = torch.tensor(0.0)
             ip_instance = load_instance(f'{train_dir}/instance_{idx+1}.lp') 
+            optimizer.zero_grad()
         else: 
             idx = np.random.randint(num_validation_instances)
-            optimizer.zero_grad()
-            loss = torch.tensor(0.0)
             ip_instance = load_instance(f'{valid_dir}/instance_{idx+1}.lp') 
             model.eval()
-        
+        loss = torch.tensor(0.0, requires_grad = bool(training_mask[i]))
+
         problems = tree_search_train(ip_instance, model.predictor, encoder = encoder, p0 = 0.05, p1 = 0.95)
         V, C, E, sols = [], [], [], []
         
