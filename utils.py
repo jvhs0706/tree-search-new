@@ -44,9 +44,8 @@ def tree_search(ip, predictor, *predictor_args, **predictor_kwargs):
     '''
     predictor(ip, *predictor_args, **predictor_kwargs) -> [(indicies_1, values_1), (indicies_2, values_2), ..., (indicies_M, values_M)]
     '''
-
     ip.setParam('OutputFlag', 0)
-
+    
     root_node = assign_values(ip, [], [])
     if type(root_node) == gp.Model:
         nodes = deque([root_node])
@@ -70,7 +69,7 @@ def tree_search(ip, predictor, *predictor_args, **predictor_kwargs):
     else:
         return root_node 
 
-def solve_model(ip):
+def solve_instance(ip):
     ip.setParam('OutputFlag', 0)
     ip.optimize()
     variables = ip.getVars()
@@ -93,7 +92,7 @@ def tree_search_train(ip, predictor, *predictor_args, **predictor_kwargs):
             qip = nodes.popleft()
             qip.setParam('OutputFlag', 0)
             try:
-                opt_sol, _ = solve_model(qip)
+                opt_sol, _ = solve_instance(qip)
                 training_set.append((qip, opt_sol))
                 proposals = predictor(qip, *predictor_args, **predictor_kwargs)
                 for (indicies, values) in proposals:

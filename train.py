@@ -64,11 +64,28 @@ if __name__ == '__main__':
         type = int, 
         required= True
     )
+    parser.add_argument(
+        '-p0', '--threshold_prob_0',
+        help = 'Threshold probability for predicting 0.',
+        type = float, 
+        required= True
+    )
+    parser.add_argument(
+        '-p1', '--threshold_prob_1',
+        help = 'Threshold probability for predicting 1.',
+        type = float,
+        required = True
+    )
+    parser.add_argument(
+        '-a', '--accelerate',
+        help = 'Accelerate by merging different problems of the same instance into one graph, but it requires large memory.',
+        action = 'store_true'
+    )
     args = parser.parse_args()
     
     data_dir = f'data/instances/{args.problem}'
-    train_dir = '_'.join([f'{data_dir}/train'] + [str(s) for s in args.problem_params])
-    valid_dir = '_'.join([f'{data_dir}/valid'] + [str(s) for s in args.problem_params])
+    train_dir = '_'.join([f'{data_dir}/train'] + args.problem_params)
+    valid_dir = '_'.join([f'{data_dir}/valid'] + args.problem_params)
 
     num_training_instances = len(os.listdir(train_dir))
     num_validation_instances = len(os.listdir(valid_dir))
@@ -98,36 +115,50 @@ if __name__ == '__main__':
             model.eval()
         loss = torch.tensor(0.0, requires_grad = bool(training_mask[i]))
 
-        problems = tree_search_train(ip_instance, model.predictor, encoder = encoder, p0 = 0.05, p1 = 0.95)
-        V, C, E, sols = [], [], [], []
+        problems = tree_search_train(ip_instance, model.predictor, encoder = encoder, p0 = args.threshold_prob_0, p1 = args.threshold_prob_1)
         
-        v_slices, c_slices, V, C, E, sols = [], [], [], [], [], []
-        for ip, sol in problems:
-            v, c, e = encoder(ip)
-            V.append(v), C.append(c), E.append(e.coalesce())
-            sols.append(sol)
-            num_v, num_c = v.shape[0], c.shape[0]
-            v_start, c_start = 0 if len(v_slices) == 0 else v_slices[-1].stop, 0 if len(c_slices) == 0 else c_slices[-1].stop
-            v_slices.append(slice(v_start, v_start + num_v))
-            c_slices.append(slice(c_start, c_start + num_c))
+        if args.accelerate:
+            V, C, E, sols = [], [], [], []
+            
+            v_slices, c_slices, V, C, E, sols = [], [], [], [], [], []
+            for ip, sol in problems:
+                v, c, e = encoder(ip)
+                V.append(v), C.append(c), E.append(e.coalesce())
+                sols.append(sol)
+                num_v, num_c = v.shape[0], c.shape[0]
+                v_start, c_start = 0 if len(v_slices) == 0 else v_slices[-1].stop, 0 if len(c_slices) == 0 else c_slices[-1].stop
+                v_slices.append(slice(v_start, v_start + num_v))
+                c_slices.append(slice(c_start, c_start + num_c))
 
-        V = torch.cat(V, dim = 0)
-        C = torch.cat(C, dim = 0)
+            V = torch.cat(V, dim = 0)
+            C = torch.cat(C, dim = 0)
 
-        E_indices = torch.cat([e.indices() + torch.tensor([[cs.start], [vs.start]]) for e, cs, vs in zip(E, c_slices, v_slices)], axis = 1)
-        E_values = torch.cat([e.values() for e in E])
-        E_shape = (C.shape[0], V.shape[0], E_values.shape[-1])
-        E = torch.sparse_coo_tensor(E_indices, E_values, E_shape)
+            E_indices = torch.cat([e.indices() + torch.tensor([[cs.start], [vs.start]]) for e, cs, vs in zip(E, c_slices, v_slices)], axis = 1)
+            E_values = torch.cat([e.values() for e in E])
+            E_shape = (C.shape[0], V.shape[0], E_values.shape[-1])
+            E = torch.sparse_coo_tensor(E_indices, E_values, E_shape)
 
-        prob_maps = model(V, C, E)
+            prob_maps = model(V, C, E)
 
-        for vs, sol in zip(v_slices, sols):
-            _loss, _index = Loss(input = prob_maps[vs], target = torch.tensor(sol).unsqueeze(-1).expand(*prob_maps[vs].shape).float()).mean(axis = 0).min(dim = 0)
-            loss = loss + _loss / len(problems)
-            if training_mask[i]:
-                train_best_map_hist[_index.item()] += 1
-            else:
-                valid_best_map_hist[_index.item()] += 1
+            for vs, sol in zip(v_slices, sols):
+                _loss, _index = Loss(input = prob_maps[vs], target = torch.tensor(sol).unsqueeze(-1).expand(*prob_maps[vs].shape).float()).mean(axis = 0).min(dim = 0)
+                loss = loss + _loss / len(problems)
+                if training_mask[i]:
+                    train_best_map_hist[_index.item()] += 1
+                else:
+                    valid_best_map_hist[_index.item()] += 1
+
+        else:
+            for ip, sol in problems:
+                v, c, e = encoder(ip)
+                prob_maps = model(v, c, e)
+                _loss, _index = Loss(input = prob_maps, target = torch.tensor(sol).unsqueeze(-1).expand(*prob_maps.shape).float()).mean(axis = 0).min(dim = 0)
+                loss = loss + _loss / len(problems)
+                if training_mask[i]:
+                    train_best_map_hist[_index.item()] += 1
+                else:
+                    valid_best_map_hist[_index.item()] += 1
+        
         loss_hist.append(loss.item()), tree_size_hist.append(len(problems))
         
         if training_mask[i]:
@@ -168,12 +199,12 @@ if __name__ == '__main__':
     # save the model
     model_dir = f'models/'+ '_'.join([args.problem] + args.problem_params)
     os.makedirs(model_dir, exist_ok = True)
-    config = {
+    model_config = {
         'variable_features': args.variable_features,
         'constraint_features': args.constraint_features,
         'edge_features': args.edge_features,
         'num_prob_map': args.num_prob_map
     }
-    with open(model_dir +'/config.json', 'w') as f:
-        json.dump(config, f)
+    with open(model_dir +'/model_config.json', 'w') as f:
+        json.dump(model_config, f)
     torch.save(model.state_dict(), model_dir + '/model_state_dict')
