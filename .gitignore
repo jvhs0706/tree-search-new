@@ -1,3 +1,4 @@
-data*
-dummy*
+dummy.py
 __pycache__
+models/
+data/
