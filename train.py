@@ -77,6 +77,17 @@ if __name__ == '__main__':
         required = True
     )
     parser.add_argument(
+        '-M', '--max_num_node',
+        help = 'Maximum number of nodes in any tree search problem.',
+        type = int, 
+        required = True
+    )
+    parser.add_argument(
+        '-bn', '--batch_norm', 
+        help = 'Do batch normalization in the model', 
+        action = 'store_true'
+    )
+    parser.add_argument(
         '-a', '--accelerate',
         help = 'Accelerate by merging different problems of the same instance into one graph, but it requires large memory.',
         action = 'store_true'
@@ -90,10 +101,11 @@ if __name__ == '__main__':
     num_training_instances = len(os.listdir(train_dir))
     num_validation_instances = len(os.listdir(valid_dir))
 
-    model = Model(v_dim=len(args.variable_features), c_dim=len(args.constraint_features), e_dim=len(args.edge_features), K = args.num_prob_map)
+    model = Model(v_dim=len(args.variable_features), c_dim=len(args.constraint_features), e_dim=len(args.edge_features), K = args.num_prob_map, bn = args.batch_norm)
     encoder = BinaryIPEncoder(*['v_'+feat for feat in args.variable_features], *['c_'+feat for feat in args.constraint_features], *['e_'+feat for feat in args.edge_features])
 
     optimizer = torch.optim.Adam(model.parameters(), lr = 1e-3)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 50, 0.5)
     Loss = torch.nn.BCELoss(reduction = 'none')
 
     shuffled_indices = np.arange(args.num_training + args.num_validation)
@@ -115,7 +127,7 @@ if __name__ == '__main__':
             model.eval()
         loss = torch.tensor(0.0, requires_grad = bool(training_mask[i]))
 
-        problems = tree_search_train(ip_instance, model.predictor, encoder = encoder, p0 = args.threshold_prob_0, p1 = args.threshold_prob_1)
+        problems = tree_search_train(ip_instance, model.predictor, args.max_num_node, encoder = encoder, p0 = args.threshold_prob_0, p1 = args.threshold_prob_1)
         
         if args.accelerate:
             V, C, E, sols = [], [], [], []
@@ -164,6 +176,7 @@ if __name__ == '__main__':
         if training_mask[i]:
             loss.backward()
             optimizer.step()
+            scheduler.step()
             print(f'Step {i} (train), loss {loss.item():.3f}, tree_size {len(problems)}.')
         else:
             model.train()
@@ -203,7 +216,8 @@ if __name__ == '__main__':
         'variable_features': args.variable_features,
         'constraint_features': args.constraint_features,
         'edge_features': args.edge_features,
-        'num_prob_map': args.num_prob_map
+        'num_prob_map': args.num_prob_map, 
+        'batch_norm': args.batch_norm
     }
     with open(model_dir +'/model_config.json', 'w') as f:
         json.dump(model_config, f)

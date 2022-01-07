@@ -21,13 +21,15 @@ class HalfConv(nn.Module):
     v: features of the nodes on the opposite side (V, G)
     e: featuers of of the edges (V, U, H)
 
-    g_args (F+G+H, ..., D)
-    f_args (F+D, ...)
+    g_dims (F+G+H, ..., D)
+    f_dims (F+D, ...)
     '''
-    def __init__(self, u_dim: int, v_dim: int, e_dim: int, f_dims, g_dims):
+    def __init__(self, u_dim: int, v_dim: int, e_dim: int, f_dims, g_dims, bn: bool):
         super().__init__()    
         self.g = dense_stack(u_dim + v_dim + e_dim, *g_dims)
         self.f = dense_stack(u_dim + g_dims[-1], *f_dims)
+        if bn:
+            self.bn = nn.BatchNorm1d(f_dims[-1])
         
     def forward(self, u, v, e):
         V, U, H = e.shape
@@ -40,10 +42,12 @@ class HalfConv(nn.Module):
         g_out = self.g(torch.cat([u[e_indices[1]], v[e_indices[0]], e_values], axis = -1)) # (nnz, D)
         g_out = torch.sparse.sum(torch.sparse_coo_tensor(e_indices, g_out, (V, U, g_out.shape[-1])), dim = -3) # (V, U, D) to (U, D)
         out = self.f(torch.cat([u, g_out.to_dense()], axis = -1))
+        if hasattr(self, 'bn'):
+            out = self.bn(out)
         return out
 
 class Model(nn.Module):
-    def __init__(self, v_dim: int, c_dim: int, e_dim: int, K: int):
+    def __init__(self, v_dim: int, c_dim: int, e_dim: int, K: int, bn: bool = False):
         '''
         v_dim: dimension of variable feature vectors
         c_dim: dimension of constraint feature vectors
@@ -51,28 +55,20 @@ class Model(nn.Module):
         K: number of probablity maps to predict
         '''
         super().__init__()
-        self.initial_embedding_v = dense_stack(v_dim, 64, 64)
-        self.initial_embedding_v_bn = nn.BatchNorm1d(64)
-        self.initial_embedding_c = dense_stack(c_dim, 64, 64)
-        self.initial_embedding_c_bn = nn.BatchNorm1d(64)
+        self.initial_embedding_v = nn.Sequential(dense_stack(v_dim, 64, 64), nn.BatchNorm1d(64)) if bn else dense_stack(v_dim, 64, 64)
+        self.initial_embedding_c = nn.Sequential(dense_stack(c_dim, 64, 64), nn.BatchNorm1d(64)) if bn else dense_stack(c_dim, 64, 64)
 
-        self.c_side_convolution = HalfConv(64, 64, 1, (64, 64), (64, 64))
-        self.c_side_convolution_bn = nn.BatchNorm1d(64)
-        self.v_side_convolution = HalfConv(64, 64, 1, (64, 64), (64, 64))
-        self.v_side_convolution_bn = nn.BatchNorm1d(64)
+        self.c_side_convolution = HalfConv(64, 64, 1, (64, 64), (64, 64), bn)
+        self.v_side_convolution = HalfConv(64, 64, 1, (64, 64), (64, 64), bn)
 
         self.tail = dense_stack(64, 64, K, output_relu=False)
     
     def forward(self, v, c, e):
         v1 = self.initial_embedding_v(v)
-        v1 = self.initial_embedding_v_bn(v1)
         c1 = self.initial_embedding_c(c)
-        c1 = self.initial_embedding_c_bn(c1)
 
         c2 = self.c_side_convolution(c1, v1, e.transpose(0, 1))
-        c2 = self.c_side_convolution_bn(c2)
         v2 = self.v_side_convolution(v1, c2, e)
-        v2 = self.v_side_convolution_bn(v2)
         return torch.sigmoid(self.tail(v2))
     
     def predictor(self, ip, encoder, p0: float, p1: float):

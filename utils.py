@@ -40,9 +40,10 @@ def assign_values(ip, indicies, values):
     except gp.GurobiError as e:
         assert str(e) == 'Unable to create presolved model', str(e)
 
-def tree_search(ip, predictor, *predictor_args, **predictor_kwargs):
+def tree_search(ip, predictor, max_num_node: int, *predictor_args, **predictor_kwargs):
     '''
     predictor(ip, *predictor_args, **predictor_kwargs) -> [(indicies_1, values_1), (indicies_2, values_2), ..., (indicies_M, values_M)]
+    max_num_node: maximum number of nodes explored
     '''
     ip.setParam('OutputFlag', 0)
     
@@ -50,17 +51,20 @@ def tree_search(ip, predictor, *predictor_args, **predictor_kwargs):
     if type(root_node) == gp.Model:
         nodes = deque([root_node])
         best_val = np.inf # minimal ip.ModelSense * objval
-        while nodes:
-            qip = nodes.popleft()
-            proposals = predictor(qip, *predictor_args, **predictor_kwargs)
-            for (indicies, values) in proposals:
-                new_ip = assign_values(qip, indicies, values)
-                if new_ip is None:# Not feasible
-                    pass
-                elif type(new_ip) == gp.Model:
-                    nodes.append(new_ip)
-                else:
-                    best_val = min(best_val, ip.ModelSense * new_ip)
+        for i in range(max_num_node):
+            if nodes:
+                qip = nodes.popleft()
+                proposals = predictor(qip, *predictor_args, **predictor_kwargs)
+                for (indicies, values) in proposals:
+                    new_ip = assign_values(qip, indicies, values)
+                    if new_ip is None:# Not feasible
+                        pass
+                    elif type(new_ip) == gp.Model:
+                        nodes.append(new_ip)
+                    else:
+                        best_val = min(best_val, ip.ModelSense * new_ip)
+            else:
+                break
         return best_val * ip.ModelSense
     
     elif root_node is None:
@@ -75,9 +79,10 @@ def solve_instance(ip):
     variables = ip.getVars()
     return np.array([var.X for var in variables]).round().astype(bool), ip.ObjVal
 
-def tree_search_train(ip, predictor, *predictor_args, **predictor_kwargs):
+def tree_search_train(ip, predictor, max_num_node: int, *predictor_args, **predictor_kwargs):
     '''
     predictor(ip, *predictor_args, **predictor_kwargs) -> [(indicies_1, values_1), (indicies_2, values_2), ..., (indicies_M, values_M)]
+    max_num_node: maximum number of nodes explored
     '''
 
     ip.setParam('OutputFlag', 0)
@@ -88,18 +93,21 @@ def tree_search_train(ip, predictor, *predictor_args, **predictor_kwargs):
     root_node = assign_values(ip, [], [])
     if type(root_node) == gp.Model:
         nodes = deque([root_node])
-        while nodes:
-            qip = nodes.popleft()
-            qip.setParam('OutputFlag', 0)
-            try:
-                opt_sol, _ = solve_instance(qip)
-                training_set.append((qip, opt_sol))
-                proposals = predictor(qip, *predictor_args, **predictor_kwargs)
-                for (indicies, values) in proposals:
-                    new_ip = assign_values(qip, indicies, values)
-                    if type(new_ip) == gp.Model:
-                        nodes.append(new_ip)
-            except AttributeError as e:
-                pass
+        for i in range(max_num_node):
+            if nodes:
+                qip = nodes.popleft()
+                qip.setParam('OutputFlag', 0)
+                try:
+                    opt_sol, _ = solve_instance(qip)
+                    training_set.append((qip, opt_sol))
+                    proposals = predictor(qip, *predictor_args, **predictor_kwargs)
+                    for (indicies, values) in proposals:
+                        new_ip = assign_values(qip, indicies, values)
+                        if type(new_ip) == gp.Model:
+                            nodes.append(new_ip)
+                except AttributeError as e:
+                    pass
+            else:
+                break
 
     return training_set
