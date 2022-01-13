@@ -49,12 +49,13 @@ if __name__ == '__main__':
         help = 'Only considering the first few instances.',
         type = int,
     )
+
     args = parser.parse_args()
-    
+
     data_dir = f'data/instances/{args.problem}'
     test_dir = '_'.join([f'{data_dir}/test'] + args.problem_params)
         
-    num_testing_instances = min(len(os.listdir(test_dir)), args.first_num_instances) if hasattr(args, 'first_num_instances') else len(os.listdir(test_dir))
+    num_testing_instances = min(len(os.listdir(test_dir)), args.first_num_instances) if args.first_num_instances is not None else len(os.listdir(test_dir))
 
     model_dir = f'models/'+ '_'.join([args.problem] + args.problem_params)
     with open(model_dir +'/model_config.json', 'r') as f:
