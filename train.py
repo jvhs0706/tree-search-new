@@ -217,7 +217,9 @@ if __name__ == '__main__':
         'constraint_features': args.constraint_features,
         'edge_features': args.edge_features,
         'num_prob_map': args.num_prob_map, 
-        'batch_norm': args.batch_norm
+        'batch_norm': args.batch_norm,
+        'threshold_prob_0': args.threshold_prob_0,
+        'threshold_prob_1': args.threshold_prob_1
     }
     with open(model_dir +'/model_config.json', 'w') as f:
         json.dump(model_config, f)
