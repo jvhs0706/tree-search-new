@@ -86,3 +86,19 @@ class Model(nn.Module):
                     proposals.append((np.arange(n)[mask], probs[mask] > (p1+p0)/2))
             self.train()
             return proposals
+
+    def predictor_batch(self, ips, encoder, p0: float, p1: float):
+        proposals_batch = []
+        with torch.no_grad():
+            self.eval()
+            assert 0.0 <= p0 < p1 <= 1.0
+            V, C, E = encoder.encode_batch(ips)
+            out = self(V, C, E)
+            _, K = out.shape
+            indices = np.cumsum([0] + [ip.NumVars for ip in ips])
+            for i, ip in enumerate(ips):
+                probs = out[indices[i]: indices[i+1]].detach().numpy()
+                mask = np.logical_or(probs < p0, probs > p1)
+                proposals_batch.append([(np.arange(ips[i].numVars)[mask[:, k]], probs[mask[:, k], k] > (p1 + p0)/2) for k in range(K) if mask[:, k].sum() > 0])
+            self.train()
+        return proposals_batch

@@ -39,8 +39,8 @@ if __name__ == '__main__':
         required = True
     )
     parser.add_argument(
-        '-M', '--max_num_node',
-        help = 'Maximum number of nodes explored.',
+        '-M', '--max_tree_size',
+        help = 'Maximum tree size.',
         type = int, 
         required = True
     )
@@ -48,6 +48,11 @@ if __name__ == '__main__':
         '-N', '--first_num_instances',
         help = 'Only considering the first few instances.',
         type = int,
+    )
+    parser.add_argument(
+        '-a', '--accelerate', 
+        help = 'Accerelate by computing multiple problems at the same depth.', 
+        action = 'store_true'
     )
 
     args = parser.parse_args()
@@ -68,13 +73,19 @@ if __name__ == '__main__':
     solver_time, gurobi_time = 0.0, 0.0
     solved = 0
     gap, gap_ratio = 0.0, 0.0
-
+    
     with torch.no_grad():
         for i in range(num_testing_instances):
             ip_instance = load_instance(f'{test_dir}/instance_{i+1}.lp')
-            tic = time.time()
-            obj_val = tree_search(ip_instance, model.predictor, max_num_node = args.max_num_node, encoder = encoder, p0 = args.threshold_prob_0, p1 = args.threshold_prob_1)
-            toc = time.time()
+            
+            if args.accelerate:
+                tic = time.time()
+                obj_val = tree_search_accelerated(ip_instance, model.predictor_batch, max_depth=args.max_tree_size, encoder = encoder, p0 = args.threshold_prob_0, p1 = args.threshold_prob_1)
+                toc = time.time()
+            else:
+                tic = time.time()
+                obj_val = tree_search(ip_instance, model.predictor, max_num_node = args.max_tree_size, encoder = encoder, p0 = args.threshold_prob_0, p1 = args.threshold_prob_1)
+                toc = time.time()
             solver_time += (toc - tic)
 
             tic = time.time()

@@ -73,6 +73,36 @@ def tree_search(ip, predictor, max_num_node: int, *predictor_args, **predictor_k
     else:
         return root_node 
 
+def tree_search_accelerated(ip, batch_predictor, max_depth: int, *predictor_args, **predictor_kwargs):
+    ip.setParam('OutputFlag', 0)
+    root_node = assign_values(ip, [], [])
+    if type(root_node) == gp.Model:
+        nodes = [root_node]
+        best_val = np.inf # minimal ip.ModelSense * objval
+        for i in range(max_depth):
+            if nodes:
+                new_nodes = []
+                proposals_batch = batch_predictor(nodes, *predictor_args, **predictor_kwargs)
+                for proposals, ip in zip(proposals_batch, nodes):
+                    for (indicies, values) in proposals:
+                        new_ip = assign_values(ip, indicies, values)
+                        if new_ip is None:# Not feasible
+                            pass
+                        elif type(new_ip) == gp.Model:
+                            new_nodes.append(new_ip)
+                        else:
+                            best_val = min(best_val, ip.ModelSense * new_ip)
+                nodes = new_nodes
+            else:
+                break
+        return best_val * ip.ModelSense
+    
+    elif root_node is None:
+        return ip.ModelSense * np.inf
+    
+    else:
+        return root_node 
+
 def solve_instance(ip):
     ip.setParam('OutputFlag', 0)
     ip.optimize()
