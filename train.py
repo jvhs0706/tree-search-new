@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import os
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 import argparse
 import numpy as np
 import json
