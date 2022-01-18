@@ -40,30 +40,29 @@ def assign_values(ip, indicies, values):
     except gp.GurobiError as e:
         assert str(e) == 'Unable to create presolved model', str(e)
 
-def tree_search(ip, predictor, max_num_node: int, *predictor_args, **predictor_kwargs):
+def tree_search(ip, predictor, max_num_node, *predictor_args, **predictor_kwargs):
     '''
     predictor(ip, *predictor_args, **predictor_kwargs) -> [(indicies_1, values_1), (indicies_2, values_2), ..., (indicies_M, values_M)]
     max_num_node: maximum number of nodes explored
     '''
-    ip.setParam('OutputFlag', 0)
     
     root_node = assign_values(ip, [], [])
     if type(root_node) == gp.Model:
         nodes = deque([root_node])
-        best_val = np.inf # minimal ip.ModelSense * objval
-        for i in range(max_num_node):
-            if nodes:
-                qip = nodes.popleft()
-                proposals = predictor(qip, *predictor_args, **predictor_kwargs)
-                for (indicies, values) in proposals:
-                    new_ip = assign_values(qip, indicies, values)
-                    if new_ip is None:# Not feasible
-                        pass
-                    elif type(new_ip) == gp.Model:
-                        nodes.append(new_ip)
-                    else:
-                        best_val = min(best_val, ip.ModelSense * new_ip)
-            else:
+        best_val, num_node = np.inf, 0 # minimal ip.ModelSense * objval
+        while nodes:
+            qip = nodes.popleft()
+            proposals = predictor(qip, *predictor_args, **predictor_kwargs)
+            num_node += 1
+            for (indicies, values) in proposals:
+                new_ip = assign_values(qip, indicies, values)
+                if new_ip is None:# Not feasible
+                    pass
+                elif type(new_ip) == gp.Model:
+                    nodes.append(new_ip)
+                else:
+                    best_val = min(best_val, ip.ModelSense * new_ip)
+            if num_node >= max_num_node:
                 break
         return best_val * ip.ModelSense
     
@@ -73,28 +72,30 @@ def tree_search(ip, predictor, max_num_node: int, *predictor_args, **predictor_k
     else:
         return root_node 
 
-def tree_search_accelerated(ip, batch_predictor, max_depth: int, *predictor_args, **predictor_kwargs):
-    ip.setParam('OutputFlag', 0)
+def tree_search_accelerated(ip, batch_predictor, max_tree_height, max_num_node, *predictor_args, **predictor_kwargs):
     root_node = assign_values(ip, [], [])
+    tree_height, num_node = 0, 0
     if type(root_node) == gp.Model:
+        
         nodes = [root_node]
         best_val = np.inf # minimal ip.ModelSense * objval
-        for i in range(max_depth):
-            if nodes:
-                new_nodes = []
-                proposals_batch = batch_predictor(nodes, *predictor_args, **predictor_kwargs)
-                for proposals, ip in zip(proposals_batch, nodes):
-                    for (indicies, values) in proposals:
-                        new_ip = assign_values(ip, indicies, values)
-                        if new_ip is None:# Not feasible
-                            pass
-                        elif type(new_ip) == gp.Model:
-                            new_nodes.append(new_ip)
-                        else:
-                            best_val = min(best_val, ip.ModelSense * new_ip)
-                nodes = new_nodes
-            else:
+        while nodes:
+            new_nodes = []
+            proposals_batch = batch_predictor(nodes, *predictor_args, **predictor_kwargs)
+            for proposals, ip in zip(proposals_batch, nodes):
+                for (indicies, values) in proposals:
+                    new_ip = assign_values(ip, indicies, values)
+                    if new_ip is None: # Not feasible
+                        pass
+                    elif type(new_ip) == gp.Model:
+                        new_nodes.append(new_ip)
+                    else:
+                        best_val = min(best_val, ip.ModelSense * new_ip)
+            tree_height, num_node = tree_height + 1, num_node + len(nodes)
+            nodes = new_nodes
+            if tree_height >= max_tree_height or num_node >= max_num_node:
                 break
+            
         return best_val * ip.ModelSense
     
     elif root_node is None:
@@ -108,36 +109,3 @@ def solve_instance(ip):
     ip.optimize()
     variables = ip.getVars()
     return np.array([var.X for var in variables]).round().astype(bool), ip.ObjVal
-
-def tree_search_train(ip, predictor, max_num_node: int, *predictor_args, **predictor_kwargs):
-    '''
-    predictor(ip, *predictor_args, **predictor_kwargs) -> [(indicies_1, values_1), (indicies_2, values_2), ..., (indicies_M, values_M)]
-    max_num_node: maximum number of nodes explored
-    '''
-
-    ip.setParam('OutputFlag', 0)
-
-    best_val = np.inf # minimal ip.ModelSense * objval
-    training_set = []
-    
-    root_node = assign_values(ip, [], [])
-    if type(root_node) == gp.Model:
-        nodes = deque([root_node])
-        for i in range(max_num_node):
-            if nodes:
-                qip = nodes.popleft()
-                qip.setParam('OutputFlag', 0)
-                try:
-                    opt_sol, _ = solve_instance(qip)
-                    training_set.append((qip, opt_sol))
-                    proposals = predictor(qip, *predictor_args, **predictor_kwargs)
-                    for (indicies, values) in proposals:
-                        new_ip = assign_values(qip, indicies, values)
-                        if type(new_ip) == gp.Model:
-                            nodes.append(new_ip)
-                except AttributeError as e:
-                    pass
-            else:
-                break
-
-    return training_set

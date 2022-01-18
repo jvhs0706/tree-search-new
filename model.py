@@ -71,21 +71,35 @@ class Model(nn.Module):
         v2 = self.v_side_convolution(v1, c2, e)
         return torch.sigmoid(self.tail(v2))
     
-    def predictor(self, ip, encoder, p0: float, p1: float):
-        with torch.no_grad():
-            self.eval()
-            assert 0.0 <= p0 < p1 <= 1.0
+    def predictor(self, ip, encoder, p0: float, p1: float, mode = 'test'):
+        proposals = []
+        assert 0.0 <= p0 < p1 <= 1.0
+        
+        if mode == 'test':
+            with torch.no_grad():
+                self.eval()
+                V, C, E = encoder(ip)
+                out = self(V, C, E) # (n, K)
+                n, K = out.shape
+                probs = out.detach().numpy()
+                mask = np.logical_or(probs < p0, probs > p1)
+                proposals = [(np.arange(n)[mask[:, k]], probs[mask[:, k], k] > (p1 + p0)/2) for k in range(K) if mask[:, k].sum() > 0]
+                return proposals
+
+        else:
+            if mode == 'train':
+                self.train()
+            elif mode == 'valid':
+                self.eval()
+            else:
+                raise TypeError
             V, C, E = encoder(ip)
             out = self(V, C, E) # (n, K)
-            proposals = []
             n, K = out.shape
-            for k in range(K):
-                probs = out[:, k].detach().numpy()
-                mask = np.logical_or(probs < p0, probs > p1)
-                if mask.sum() > 0:
-                    proposals.append((np.arange(n)[mask], probs[mask] > (p1+p0)/2))
-            self.train()
-            return proposals
+            probs = out.detach().numpy()
+            mask = np.logical_or(probs < p0, probs > p1)
+            proposals = [(np.arange(n)[mask[:, k]], probs[mask[:, k], k] > (p1 + p0)/2) for k in range(K) if mask[:, k].sum() > 0]
+            return out, proposals
 
     def predictor_batch(self, ips, encoder, p0: float, p1: float, mode = 'test'):
         proposals_batch = []
@@ -101,7 +115,7 @@ class Model(nn.Module):
                     probs = out[indices[i]: indices[i+1]].detach().numpy()
                     mask = np.logical_or(probs < p0, probs > p1)
                     proposals_batch.append([(np.arange(ips[i].numVars)[mask[:, k]], probs[mask[:, k], k] > (p1 + p0)/2) for k in range(K) if mask[:, k].sum() > 0])
-            return proposals_batch
+                return proposals_batch
         else:
             if mode == 'train':
                 self.train()
@@ -118,6 +132,6 @@ class Model(nn.Module):
             for i, ip in enumerate(ips):
                 probs = out[i].detach().numpy()
                 mask = np.logical_or(probs < p0, probs > p1)
-                proposals_batch.append([(np.arange(ips[i].numVars)[mask[:, k]], probs[mask[:, k], k] > (p1 + p0)/2) if mask[:, k].sum() > 0 else None for k in range(K)])
+                proposals_batch.append([(np.arange(ips[i].numVars)[mask[:, k]], probs[mask[:, k], k] > (p1 + p0)/2) for k in range(K) if mask[:, k].sum() > 0])
             return out, proposals_batch
         

@@ -127,41 +127,66 @@ if __name__ == '__main__':
     shuffled_indices = np.arange(args.num_training + args.num_validation)
     np.random.shuffle(shuffled_indices)
     training_mask = shuffled_indices < args.num_training 
-    
- 
-    if training_mask[i]:
-        idx = np.random.randint(num_training_instances)
-        ip_instance = load_instance(f'{train_dir}/instance_{idx+1}.lp') 
-        optimizer.zero_grad()
-    else: 
-        idx = np.random.randint(num_validation_instances)
-        ip_instance = load_instance(f'{valid_dir}/instance_{idx+1}.lp') 
-        model.eval()
-    loss = torch.tensor(0.0, requires_grad = bool(training_mask[i]))
 
-    problems = tree_search_train(ip_instance, model.predictor, args.max_num_node, encoder = encoder, p0 = args.threshold_prob_0, p1 = args.threshold_prob_1)
-    for ip, sol in problems:
-        v, c, e = encoder(ip)
-        prob_maps = model(v, c, e)
-        _loss, _index = Loss(input = prob_maps, target = torch.tensor(sol).unsqueeze(-1).expand(*prob_maps.shape).float()).mean(axis = 0).min(dim = 0)
-        loss = loss + _loss / len(problems)
+    # the history of loss, the tree height, and the tree size will be kept
+    loss_hist, num_node_hist = [], []
+    train_best_map_hist, valid_best_map_hist = np.array([0] * args.num_prob_map), np.array([0] * args.num_prob_map)
+    
+    for i in range(args.num_training + args.num_validation):
         if training_mask[i]:
-            train_best_map_hist[_index.item()] += 1
-        else:
-            valid_best_map_hist[_index.item()] += 1
+            idx = np.random.randint(num_training_instances)
+            ip_instance = load_instance(f'{train_dir}/instance_{idx+1}.lp') 
+        else: 
+            idx = np.random.randint(num_validation_instances)
+            ip_instance = load_instance(f'{valid_dir}/instance_{idx+1}.lp') 
 
-    loss_hist.append(loss.item()), tree_size_hist.append(len(problems))
-    
-    if training_mask[i]:
-        loss.backward()
-        optimizer.step()
-        scheduler.step()
-        print(f'Step {i} (train), loss {loss.item():.3f}, tree_size {len(problems)}.')
-    else:
-        model.train()
-        print(f'Step {i} (valid), loss {loss.item():.3f}, tree_size {len(problems)}.')
+        num_node = 0
+        root_node = assign_values(ip_instance, [], [])
+
+        if type(root_node) == gp.Model:
+            nodes = deque([root_node])
+            mode = 'train' if training_mask[i] else 'valid'
+            loss = torch.tensor(0.0, requires_grad = bool(training_mask[i]))
+
+            while nodes:
+                qip = nodes.popleft()
+                try:
+                    # compute the loss for one node
+                    out, proposals = model.predictor(qip, encoder, p0 = args.threshold_prob_0, p1 = args.threshold_prob_1, mode = mode)
+                    opt_sol, _ = solve_instance(qip)
+                    _loss, _index = Loss(input = out, target = torch.tensor(opt_sol, dtype = torch.float).unsqueeze(-1).expand(*out.shape)).mean(axis = 0).min(dim = 0)
+                    if mode == 'train':
+                        train_best_map_hist[_index.item()] += 1
+                    else:
+                        valid_best_map_hist[_index.item()] += 1
+                    loss, num_node = loss + _loss, num_node + 1
+                    
+                    # generate the child nodes
+                    for proposal in proposals:
+                        new_ip = assign_values(qip, *proposal)
+                        if type(new_ip) == gp.Model:
+                            nodes.append(new_ip)
+                
+                except AttributeError as e:
+                    pass
+
+                # break if necessary
+                if num_node >= args.max_num_node:
+                    break
+
+            # compute the overall loss
+            loss = loss / num_node
             
-    
+            # do backprop if it is a training instance
+            if mode == 'train':
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                scheduler.step()
+            
+            # update the history
+            loss_hist.append(loss.item()), num_node_hist.append(num_node)
+            print(f'Step {i} ({mode}), loss {loss:.3f}, num_node {num_node}.')
 
     # save the model and the configurations
     model_dir = f'models/'+ '_'.join([args.problem] + args.problem_params)
@@ -174,7 +199,7 @@ if __name__ == '__main__':
         'batch_norm': args.batch_norm,
         'threshold_prob_0': args.threshold_prob_0,
         'threshold_prob_1': args.threshold_prob_1,
-        'accelerated': True
+        'accelerated': False
     }
     with open(model_dir +'/model_config.json', 'w') as f:
         json.dump(model_config, f)
@@ -189,3 +214,30 @@ if __name__ == '__main__':
         json.dump(training_config, f)
 
     torch.save(model.state_dict(), model_dir + '/model_state_dict')
+
+    # summarize the history of loss and the tree size
+    loss_hist, num_node_hist = np.array(loss_hist), np.array(num_node_hist)
+    f, axes = plt.subplots(1, 2, constrained_layout=True)
+    axes[0].set_title('Loss history')
+    axes[0].plot(np.arange(args.num_training + args.num_validation)[training_mask], loss_hist[training_mask], label = 'train')
+    axes[0].plot(np.arange(args.num_training + args.num_validation)[~training_mask], loss_hist[~training_mask], label = 'valid')
+    axes[0].legend()
+
+    axes[1].set_title('Number of nodes history')
+    axes[1].plot(np.arange(args.num_training + args.num_validation)[training_mask], num_node_hist[training_mask], label = 'train')
+    axes[1].plot(np.arange(args.num_training + args.num_validation)[~training_mask], num_node_hist[~training_mask], label = 'valid')
+    axes[1].legend()
+    
+    f.savefig(model_dir + '/training_hist.png')
+    
+    # summarize the history of best maps
+    f, axes = plt.subplots(1, 2, constrained_layout=True)
+    axes[0].set_title('train')
+    axes[0].pie(train_best_map_hist, labels = np.arange(len(train_best_map_hist)))
+    axes[0].legend()
+
+    axes[1].set_title('valid')
+    axes[1].pie(valid_best_map_hist, labels = np.arange(len(valid_best_map_hist)))
+    axes[1].legend()
+
+    f.savefig(model_dir + '/best_map_hist.png')

@@ -2,3 +2,4 @@ dummy.py
 __pycache__
 models/
 data/
+*.log

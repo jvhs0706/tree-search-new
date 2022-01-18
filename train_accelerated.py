@@ -1,17 +1,4 @@
-from utils import *
-from model import *
-from encoding import *
-
-import torch 
-import torch.nn as nn
-import torch.nn.functional as F
-
-import os
-import argparse
-import numpy as np
-import json
-
-import matplotlib.pyplot as plt
+from train import *
 
 if __name__ == '__main__':
     # arguments
@@ -162,7 +149,6 @@ if __name__ == '__main__':
                 try:
                     out, proposals_batch = model.predictor_batch(nodes, encoder, p0 = args.threshold_prob_0, p1 = args.threshold_prob_1, mode = mode)
                     for proposals, ip, _out in zip(proposals_batch, nodes, out):
-                        
                         # compute the loss for one depth level
                         opt_sol, _ = solve_instance(ip)
                         _loss, _index = Loss(input = _out, target = torch.tensor(opt_sol, dtype = torch.float).unsqueeze(-1).expand(*_out.shape)).sum(axis = 0).min(dim = 0)
@@ -174,15 +160,14 @@ if __name__ == '__main__':
                         
                         # generate the next depth level
                         for proposal in proposals:
-                            if proposal is not None:
-                                new_ip = assign_values(ip, *proposal)
-                                if type(new_ip) == gp.Model:
-                                    new_nodes.append(new_ip)
+                            new_ip = assign_values(ip, *proposal)
+                            if type(new_ip) == gp.Model:
+                                new_nodes.append(new_ip)
                                 
                 except AttributeError as e:
                     pass
                 
-                # update the bookkeeping variables and the list of nodes
+                # update the bookkeeping variables and the list of nodes, break if necessary
                 tree_height, num_node = tree_height + 1, num_node + len(nodes)
                 if tree_height >= args.max_tree_height or num_node >= args.max_num_node:
                     break
