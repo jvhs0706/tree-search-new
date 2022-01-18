@@ -41,8 +41,12 @@ if __name__ == '__main__':
     parser.add_argument(
         '-M', '--max_tree_size',
         help = 'Maximum tree size.',
-        type = int, 
-        required = True
+        type = int
+    )
+    parser.add_argument(
+        '-H', '--max_tree_height',
+        help = 'Maximum tree height.',
+        type = int
     )
     parser.add_argument(
         '-N', '--first_num_instances',
@@ -80,7 +84,7 @@ if __name__ == '__main__':
             
             if args.accelerate:
                 tic = time.time()
-                obj_val = tree_search_accelerated(ip_instance, model.predictor_batch, max_depth=args.max_tree_size, encoder = encoder, p0 = args.threshold_prob_0, p1 = args.threshold_prob_1)
+                obj_val = tree_search_accelerated(ip_instance, model.predictor_batch, max_depth=args.max_tree_height, encoder = encoder, p0 = args.threshold_prob_0, p1 = args.threshold_prob_1)
                 toc = time.time()
             else:
                 tic = time.time()

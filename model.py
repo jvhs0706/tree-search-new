@@ -87,18 +87,37 @@ class Model(nn.Module):
             self.train()
             return proposals
 
-    def predictor_batch(self, ips, encoder, p0: float, p1: float):
+    def predictor_batch(self, ips, encoder, p0: float, p1: float, mode = 'test'):
         proposals_batch = []
-        with torch.no_grad():
+        assert 0.0 <= p0 < p1 <= 1.0
+        if mode == 'test':
             self.eval()
-            assert 0.0 <= p0 < p1 <= 1.0
+            with torch.no_grad():
+                V, C, E = encoder.encode_batch(ips)
+                out = self(V, C, E)
+                _, K = out.shape
+                indices = np.cumsum([0] + [ip.NumVars for ip in ips])
+                for i, ip in enumerate(ips):
+                    probs = out[indices[i]: indices[i+1]].detach().numpy()
+                    mask = np.logical_or(probs < p0, probs > p1)
+                    proposals_batch.append([(np.arange(ips[i].numVars)[mask[:, k]], probs[mask[:, k], k] > (p1 + p0)/2) for k in range(K) if mask[:, k].sum() > 0])
+            return proposals_batch
+        else:
+            if mode == 'train':
+                self.train()
+            elif mode == 'valid':
+                self.eval()
+            else:
+                raise TypeError
+
             V, C, E = encoder.encode_batch(ips)
             out = self(V, C, E)
             _, K = out.shape
             indices = np.cumsum([0] + [ip.NumVars for ip in ips])
+            out = [out[indices[i]: indices[i+1]] for i in range(len(ips))]
             for i, ip in enumerate(ips):
-                probs = out[indices[i]: indices[i+1]].detach().numpy()
+                probs = out[i].detach().numpy()
                 mask = np.logical_or(probs < p0, probs > p1)
-                proposals_batch.append([(np.arange(ips[i].numVars)[mask[:, k]], probs[mask[:, k], k] > (p1 + p0)/2) for k in range(K) if mask[:, k].sum() > 0])
-            self.train()
-        return proposals_batch
+                proposals_batch.append([(np.arange(ips[i].numVars)[mask[:, k]], probs[mask[:, k], k] > (p1 + p0)/2) if mask[:, k].sum() > 0 else None for k in range(K)])
+            return out, proposals_batch
+        
