@@ -51,7 +51,7 @@ if __name__ == '__main__':
         default = np.inf
     )
     parser.add_argument(
-        '-N', '--first_num_instances',
+        '-n', '--first_num_instances',
         help = 'Only considering the first few instances.',
         type = int,
     )
@@ -63,11 +63,18 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    # use gpu if available
+    if torch.cuda.is_available():
+        torch.set_default_tensor_type('torch.cuda.FloatTensor')
+
+    # load data
     data_dir = f'data/instances/{args.problem}'
     test_dir = '_'.join([f'{data_dir}/test'] + args.problem_params)
-        
+    
+    # number of test instances used
     num_testing_instances = min(len(os.listdir(test_dir)), args.first_num_instances) if args.first_num_instances is not None else len(os.listdir(test_dir))
 
+    # load model and encoder
     model_dir = f'models/'+ '_'.join([args.problem] + args.problem_params)
     with open(model_dir +'/model_config.json', 'r') as f:
         model_config = json.load(f)
@@ -76,10 +83,12 @@ if __name__ == '__main__':
     model.load_state_dict(torch.load(model_dir + '/model_state_dict'))
     encoder = BinaryIPEncoder(*['v_'+feat for feat in model_config['variable_features']], *['c_'+feat for feat in model_config['constraint_features']], *['e_'+feat for feat in model_config['edge_features']])    
     
+    # keeping the running time and performance
     solver_time, gurobi_time = 0.0, 0.0
     solved = 0
     gap, gap_ratio = 0.0, 0.0
     
+    # testing loop: will be timed
     with torch.no_grad():
         for i in range(num_testing_instances):
             ip_instance = load_instance(f'{test_dir}/instance_{i+1}.lp')
@@ -103,7 +112,8 @@ if __name__ == '__main__':
                 solved += 1
                 gap += abs(obj_val - opt_obj_val)
                 gap_ratio += abs((obj_val - opt_obj_val)/opt_obj_val)
-        
+    
+    # print the statistics
     print(f'Average running time: solver {solver_time / num_testing_instances:.3f} s, gurobi {gurobi_time / num_testing_instances:.3f} s.')
     print(f'Solved: {solved} out of {num_testing_instances}.')
     print(f'Average gap {gap / solved}, average normalized gap {gap_ratio / solved}.')

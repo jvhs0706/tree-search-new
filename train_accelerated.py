@@ -100,6 +100,11 @@ if __name__ == '__main__':
         default = 0.5
     )
     args = parser.parse_args()
+
+    # use gpu if available
+    if torch.cuda.is_available():
+        torch.set_default_tensor_type('torch.cuda.FloatTensor')
+
     
     # data directories
     data_dir = f'data/instances/{args.problem}'
@@ -116,19 +121,17 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(model.parameters(), lr = args.learning_rate)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.step_size, args.gamma)
     Loss = torch.nn.BCELoss(reduction = 'none')
-
+    
     # shuffle the appearences of the training instances and validation instances
-    shuffled_indices = np.arange(args.num_training + args.num_validation)
-    np.random.shuffle(shuffled_indices)
-    training_mask = shuffled_indices < args.num_training 
+    splitter = DatasetSplitter(args.num_training, args.num_validation)
     
     # the history of loss, the tree height, and the tree size will be kept
-    loss_hist, tree_height_hist, num_node_hist = [], [], []
+    loss_hist, tree_height_hist, num_node_hist, training_mask = [], [], [], []
     train_best_map_hist, valid_best_map_hist = np.array([0] * args.num_prob_map), np.array([0] * args.num_prob_map)
     
     # training loop
-    for i in range(args.num_training + args.num_validation):
-        if training_mask[i]:
+    for i, mode in enumerate(splitter):
+        if mode == 'train':
             idx = np.random.randint(num_training_instances)
             ip_instance = load_instance(f'{train_dir}/instance_{idx+1}.lp') 
         else: 
@@ -141,52 +144,56 @@ if __name__ == '__main__':
         # build the tree for one instance by increasing depth
         if type(root_node) == gp.Model:
             nodes = [root_node]
-            mode = 'train' if training_mask[i] else 'valid'
-
-            loss, var_count = torch.tensor(0.0, requires_grad = bool(training_mask[i]), dtype = torch.float), 0
+            tree_loss = 0.0
             while nodes:
                 new_nodes = []
                 try:
-                    out, proposals_batch = model.predictor_batch(nodes, encoder, p0 = args.threshold_prob_0, p1 = args.threshold_prob_1, mode = mode)
-                    for proposals, ip, _out in zip(proposals_batch, nodes, out):
-                        # compute the loss for one depth level
-                        opt_sol, _ = solve_instance(ip)
-                        _loss, _index = Loss(input = _out, target = torch.tensor(opt_sol, dtype = torch.float).unsqueeze(-1).expand(*_out.shape)).sum(axis = 0).min(dim = 0)
-                        if mode == 'train':
-                            train_best_map_hist[_index.item()] += 1
-                        else:
-                            valid_best_map_hist[_index.item()] += 1
-                        loss, var_count = loss + _loss, var_count + ip.NumVars
-                        
-                        # generate the next depth level
-                        for proposal in proposals:
-                            new_ip = assign_values(ip, *proposal)
-                            if type(new_ip) == gp.Model:
-                                new_nodes.append(new_ip)
+                    out, probs, proposals_batch = model.predictor_batch(nodes, encoder, p0 = args.threshold_prob_0, p1 = args.threshold_prob_1, mode = mode)
+                    var_count, best_index, opt_sols = 0, [], []
+                    with torch.no_grad():
+                        for proposals, ip, p in zip(proposals_batch, nodes, probs):
+                            # compute the loss for one depth level
+                            _sol, _ = solve_instance(ip)
+                            _, _index = Loss(input = p, target = torch.tensor(_sol, dtype = torch.float).unsqueeze(-1).expand(*p.shape)).sum(axis = 0).min(dim = 0)
+                            best_index += [_index] * ip.numVars
+                            opt_sols.append(_sol) 
+                            if mode == 'train':
+                                train_best_map_hist[_index.item()] += 1
+                            else:
+                                valid_best_map_hist[_index.item()] += 1
+                            var_count = var_count + ip.NumVars
+                            
+                            # generate the next depth level
+                            for proposal in proposals:
+                                new_ip = assign_values(ip, *proposal)
+                                if type(new_ip) == gp.Model:
+                                    new_nodes.append(new_ip)
+
+                    # compute the overall loss
+                    loss = Loss(input = out[torch.arange(var_count), torch.tensor(best_index)], target = torch.tensor(np.concatenate(opt_sols), dtype = torch.float)).mean()
+
+                    # do backprop if it is a training instance
+                    if mode == 'train':
+                        optimizer.zero_grad()
+                        loss.backward()
+                        optimizer.step()
+                        scheduler.step()
                                 
                 except AttributeError as e:
                     pass
                 
                 # update the bookkeeping variables and the list of nodes, break if necessary
-                tree_height, num_node = tree_height + 1, num_node + len(nodes)
+                tree_loss, tree_height, num_node = tree_loss + loss.item(), tree_height + 1, num_node + len(nodes)
                 if tree_height >= args.max_tree_height or num_node >= args.max_num_node:
                     break
                 else:
                     nodes = new_nodes
 
-            # compute the overall loss
-            loss = loss / var_count
             
-            # do backprop if it is a training instance
-            if mode == 'train':
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                scheduler.step()
             
             # update the history
-            loss_hist.append(loss.item()), tree_height_hist.append(tree_height), num_node_hist.append(num_node)
-            print(f'Step {i} ({mode}), loss {loss:.3f}, tree_height {tree_height}, num_node {num_node}.')
+            loss_hist.append(tree_loss/tree_height), tree_height_hist.append(tree_height), num_node_hist.append(num_node), training_mask.append(mode == 'train')
+            print(f'Step {i} ({mode}), loss {tree_loss/tree_height:.3f}, tree_height {tree_height}, num_node {num_node}.')
 
     # save the model and the configurations
     model_dir = f'models/'+ '_'.join([args.problem] + args.problem_params)
@@ -216,7 +223,7 @@ if __name__ == '__main__':
     torch.save(model.state_dict(), model_dir + '/model_state_dict')
     
     # summarize the history of loss and the tree size
-    loss_hist, tree_height_hist, num_node_hist = np.array(loss_hist), np.array(tree_height_hist), np.array(num_node_hist)
+    loss_hist, tree_height_hist, num_node_hist, training_mask = np.array(loss_hist), np.array(tree_height_hist), np.array(num_node_hist), np.array(training_mask)
     f, axes = plt.subplots(1, 3, constrained_layout=True)
     axes[0].set_title('Loss history')
     axes[0].plot(np.arange(args.num_training + args.num_validation)[training_mask], loss_hist[training_mask], label = 'train')

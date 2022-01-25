@@ -79,59 +79,78 @@ class Model(nn.Module):
             with torch.no_grad():
                 self.eval()
                 V, C, E = encoder(ip)
-                out = self(V, C, E) # (n, K)
-                n, K = out.shape
-                probs = out.detach().numpy()
-                mask = np.logical_or(probs < p0, probs > p1)
-                proposals = [(np.arange(n)[mask[:, k]], probs[mask[:, k], k] > (p1 + p0)/2) for k in range(K) if mask[:, k].sum() > 0]
+                probs = self(V, C, E) # (n, K)
+                n, K = probs.shape
+                mask = torch.logical_or(probs < p0, probs > p1)
+                proposals = [(torch.arange(n)[mask[:, k]], probs[mask[:, k], k] > (p1 + p0)/2) for k in range(K) if mask[:, k].sum() > 0]
                 return proposals
-
-        else:
-            if mode == 'train':
-                self.train()
-            elif mode == 'valid':
+        
+        elif mode == 'valid':
+            with torch.no_grad():
                 self.eval()
-            else:
-                raise TypeError
+                V, C, E = encoder(ip)
+                probs = self(V, C, E) # (n, K)
+                n, K = probs.shape
+                mask = torch.logical_or(probs < p0, probs > p1)
+                proposals = [(torch.arange(n)[mask[:, k]], probs[mask[:, k], k] > (p1 + p0)/2) for k in range(K) if mask[:, k].sum() > 0]
+                return probs, proposals
+        
+        elif mode == 'train':
+            self.train()
             V, C, E = encoder(ip)
-            out = self(V, C, E) # (n, K)
-            n, K = out.shape
-            probs = out.detach().numpy()
-            mask = np.logical_or(probs < p0, probs > p1)
-            proposals = [(np.arange(n)[mask[:, k]], probs[mask[:, k], k] > (p1 + p0)/2) for k in range(K) if mask[:, k].sum() > 0]
-            return out, proposals
+            probs = self(V, C, E) # (n, K)
+            with torch.no_grad():
+                n, K = probs.shape
+                mask = torch.logical_or(probs < p0, probs > p1)
+                proposals = [(torch.arange(n)[mask[:, k]], probs[mask[:, k], k] > (p1 + p0)/2) for k in range(K) if mask[:, k].sum() > 0]
+            return probs, proposals
+        
+        else:
+            raise TypeError
 
     def predictor_batch(self, ips, encoder, p0: float, p1: float, mode = 'test'):
         proposals_batch = []
         assert 0.0 <= p0 < p1 <= 1.0
         if mode == 'test':
-            self.eval()
             with torch.no_grad():
+                self.eval()
                 V, C, E = encoder.encode_batch(ips)
                 out = self(V, C, E)
                 _, K = out.shape
                 indices = np.cumsum([0] + [ip.NumVars for ip in ips])
+                mask = torch.logical_or(out < p0, out > p1)
                 for i, ip in enumerate(ips):
-                    probs = out[indices[i]: indices[i+1]].detach().numpy()
-                    mask = np.logical_or(probs < p0, probs > p1)
-                    proposals_batch.append([(np.arange(ips[i].numVars)[mask[:, k]], probs[mask[:, k], k] > (p1 + p0)/2) for k in range(K) if mask[:, k].sum() > 0])
+                    _out, _mask = out[indices[i]: indices[i+1]], mask[indices[i]: indices[i+1]]
+                    proposals_batch.append([(torch.arange(ips[i].numVars)[_mask[:, k]], _out[_mask[:, k], k] > (p1 + p0)/2) for k in range(K) if _mask[:, k].sum() > 0])
                 return proposals_batch
-        else:
-            if mode == 'train':
-                self.train()
-            elif mode == 'valid':
+        
+        elif mode == 'valid':
+            with torch.no_grad():
                 self.eval()
-            else:
-                raise TypeError
+                V, C, E = encoder.encode_batch(ips)
+                out = self(V, C, E)
+                _, K = out.shape
+                indices = np.cumsum([0] + [ip.NumVars for ip in ips])
+                mask = torch.logical_or(out < p0, out > p1)
+                probs = []
+                for i, ip in enumerate(ips):
+                    _out, _mask = out[indices[i]: indices[i+1]], mask[indices[i]: indices[i+1]]
+                    proposals_batch.append([(torch.arange(ips[i].numVars)[_mask[:, k]], _out[_mask[:, k], k] > (p1 + p0)/2) for k in range(K) if _mask[:, k].sum() > 0])
+                    probs.append(_out)
+                return out, probs, proposals_batch
 
+        elif mode == 'train':
+            self.train()
             V, C, E = encoder.encode_batch(ips)
             out = self(V, C, E)
-            _, K = out.shape
-            indices = np.cumsum([0] + [ip.NumVars for ip in ips])
-            out = [out[indices[i]: indices[i+1]] for i in range(len(ips))]
-            for i, ip in enumerate(ips):
-                probs = out[i].detach().numpy()
-                mask = np.logical_or(probs < p0, probs > p1)
-                proposals_batch.append([(np.arange(ips[i].numVars)[mask[:, k]], probs[mask[:, k], k] > (p1 + p0)/2) for k in range(K) if mask[:, k].sum() > 0])
-            return out, proposals_batch
+            with torch.no_grad():
+                _, K = out.shape
+                indices = np.cumsum([0] + [ip.NumVars for ip in ips])
+                mask = torch.logical_or(out < p0, out > p1)
+                probs = []
+                for i, ip in enumerate(ips):
+                    _out, _mask = out[indices[i]: indices[i+1]], mask[indices[i]: indices[i+1]]
+                    proposals_batch.append([(torch.arange(ips[i].numVars)[_mask[:, k]], _out[_mask[:, k], k] > (p1 + p0)/2) for k in range(K) if _mask[:, k].sum() > 0])
+                    probs.append(_out)
+            return out, probs, proposals_batch
         

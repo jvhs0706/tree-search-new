@@ -97,7 +97,7 @@ if __name__ == '__main__':
         '-ss', '--step_size',
         help = 'The step size of the StepLR lr_scheduler.',
         type = int, 
-        default = 128
+        default = 64
     )
     parser.add_argument(
         '-g', '--gamma', 
@@ -106,6 +106,10 @@ if __name__ == '__main__':
         default = 0.5
     )
     args = parser.parse_args()
+
+    # use gpu if available
+    if torch.cuda.is_available():
+        torch.set_default_tensor_type('torch.cuda.FloatTensor')
     
     # data directories
     data_dir = f'data/instances/{args.problem}'
@@ -124,16 +128,14 @@ if __name__ == '__main__':
     Loss = torch.nn.BCELoss(reduction = 'none')
 
     # shuffle the appearences of the training instances and validation instances
-    shuffled_indices = np.arange(args.num_training + args.num_validation)
-    np.random.shuffle(shuffled_indices)
-    training_mask = shuffled_indices < args.num_training 
+    splitter = DatasetSplitter(args.num_training, args.num_validation)
 
     # the history of loss, the tree height, and the tree size will be kept
-    loss_hist, num_node_hist = [], []
+    loss_hist, num_node_hist, training_mask = [], [], []
     train_best_map_hist, valid_best_map_hist = np.array([0] * args.num_prob_map), np.array([0] * args.num_prob_map)
     
-    for i in range(args.num_training + args.num_validation):
-        if training_mask[i]:
+    for i, mode in enumerate(splitter):
+        if mode == 'train':
             idx = np.random.randint(num_training_instances)
             ip_instance = load_instance(f'{train_dir}/instance_{idx+1}.lp') 
         else: 
@@ -145,8 +147,7 @@ if __name__ == '__main__':
 
         if type(root_node) == gp.Model:
             nodes = deque([root_node])
-            mode = 'train' if training_mask[i] else 'valid'
-            loss = torch.tensor(0.0, requires_grad = bool(training_mask[i]))
+            loss = torch.tensor(0.0)
 
             while nodes:
                 qip = nodes.popleft()
@@ -185,7 +186,7 @@ if __name__ == '__main__':
                 scheduler.step()
             
             # update the history
-            loss_hist.append(loss.item()), num_node_hist.append(num_node)
+            loss_hist.append(loss.item()), num_node_hist.append(num_node), training_mask.append(mode == 'train')
             print(f'Step {i} ({mode}), loss {loss:.3f}, num_node {num_node}.')
 
     # save the model and the configurations
@@ -216,7 +217,7 @@ if __name__ == '__main__':
     torch.save(model.state_dict(), model_dir + '/model_state_dict')
 
     # summarize the history of loss and the tree size
-    loss_hist, num_node_hist = np.array(loss_hist), np.array(num_node_hist)
+    loss_hist, num_node_hist, training_mask = np.array(loss_hist), np.array(num_node_hist), np.array(training_mask)
     f, axes = plt.subplots(1, 2, constrained_layout=True)
     axes[0].set_title('Loss history')
     axes[0].plot(np.arange(args.num_training + args.num_validation)[training_mask], loss_hist[training_mask], label = 'train')

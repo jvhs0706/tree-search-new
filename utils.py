@@ -109,3 +109,35 @@ def solve_instance(ip):
     ip.optimize()
     variables = ip.getVars()
     return np.array([var.X for var in variables]).round().astype(bool), ip.ObjVal
+
+class DatasetSplitter:
+    '''
+    Split the training steps and testing steps
+    It does not remember anything
+    '''
+    def __init__(self, num_train: int, num_valid: int):
+        assert num_train >= 0 and num_valid >= 0
+        self.num_train, self.num_valid = num_train, num_valid
+
+    def __call__(self):
+        if np.random.rand() < self.num_train / (self.num_train + self.num_valid):
+            self.num_train -= 1
+            return 'train'
+        else:
+            self.num_valid -= 1
+            return 'valid' 
+
+    def __iter__(self):
+        return self 
+    
+    def __next__(self):
+        if self.num_train + self.num_valid > 0:
+            return self()
+        else:
+            raise StopIteration
+
+    def __len__(self):
+        '''
+        How many steps are ``left``
+        '''
+        return self.num_train + self.num_valid
