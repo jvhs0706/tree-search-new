@@ -154,7 +154,7 @@ if __name__ == '__main__':
                 try:
                     # compute the loss for one node
                     out, proposals = model.predictor(qip, encoder, p0 = args.threshold_prob_0, p1 = args.threshold_prob_1, mode = mode)
-                    opt_sol, _ = solve_instance(qip)
+                    opt_sol, _ = solve_instance(qip, OutputFlag = 0)
                     _loss, _index = Loss(input = out, target = torch.tensor(opt_sol, dtype = torch.float).unsqueeze(-1).expand(*out.shape)).mean(axis = 0).min(dim = 0)
                     if mode == 'train':
                         train_best_map_hist[_index.item()] += 1

@@ -104,8 +104,9 @@ def tree_search_accelerated(ip, batch_predictor, max_tree_height, max_num_node, 
     else:
         return root_node 
 
-def solve_instance(ip):
-    ip.setParam('OutputFlag', 0)
+def solve_instance(ip, **kwargs):
+    for p, val in kwargs.items():
+        ip.setParam(p, val)
     ip.optimize()
     variables = ip.getVars()
     return np.array([var.X for var in variables]).round().astype(bool), ip.ObjVal

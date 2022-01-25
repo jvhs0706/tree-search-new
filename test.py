@@ -104,7 +104,7 @@ if __name__ == '__main__':
             solver_time += (toc - tic)
 
             tic = time.time()
-            _, opt_obj_val = solve_instance(ip_instance)
+            _, opt_obj_val = solve_instance(ip_instance, OutputFlag = 0, Threads = 1)
             toc = time.time()
             gurobi_time += (toc - tic)
 

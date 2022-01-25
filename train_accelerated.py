@@ -153,7 +153,7 @@ if __name__ == '__main__':
                     with torch.no_grad():
                         for proposals, ip, p in zip(proposals_batch, nodes, probs):
                             # compute the loss for one depth level
-                            _sol, _ = solve_instance(ip)
+                            _sol, _ = solve_instance(ip, OutputFlag = 0)
                             _, _index = Loss(input = p, target = torch.tensor(_sol, dtype = torch.float).unsqueeze(-1).expand(*p.shape)).sum(axis = 0).min(dim = 0)
                             best_index += [_index] * ip.numVars
                             opt_sols.append(_sol) 
