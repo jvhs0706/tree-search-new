@@ -16,6 +16,11 @@ if __name__ == '__main__':
         help = 'Problem parameters to identify the instances.',
         nargs = '*'
     )
+    parser.add_argument(
+        '-rmk', '--remarks',
+        help = 'The other remarks you want to add in the file name.',
+        nargs = '*'
+    )
     args = parser.parse_args()
     model_dir = f'models/'+ '_'.join([args.problem] + args.problem_params)
-    shutil.make_archive(model_dir + ' ' + datetime.now().strftime('%Y-%m-%d %H%M%S'), 'zip', model_dir)
+    shutil.make_archive(model_dir + ' ' + datetime.now().strftime('%Y-%m-%d %H%M%S') + (' '+'_'.join(args.remarks) if args.remarks is not None else ''), 'zip', model_dir)
