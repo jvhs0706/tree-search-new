@@ -103,7 +103,7 @@ if __name__ == '__main__':
         '-g', '--gamma', 
         help = 'The gamma value of the StepLR lr_scheduler.',
         type = float,
-        default = 0.5
+        default = 1.0
     )
     args = parser.parse_args()
 
