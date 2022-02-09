@@ -142,7 +142,7 @@ if __name__ == '__main__':
             idx = np.random.randint(num_validation_instances)
             ip_instance = load_instance(f'{valid_dir}/instance_{idx+1}.lp') 
 
-        num_node = 0
+        num_node, num_var = 0, 0
         root_node = assign_values(ip_instance, [], [])
 
         if type(root_node) == gp.Model:
@@ -155,12 +155,12 @@ if __name__ == '__main__':
                     # compute the loss for one node
                     out, proposals = model.predictor(qip, encoder, p0 = args.threshold_prob_0, p1 = args.threshold_prob_1, mode = mode)
                     opt_sol, _ = solve_instance(qip, OutputFlag = 0)
-                    _loss, _index = Loss(input = out, target = torch.tensor(opt_sol, dtype = torch.float).unsqueeze(-1).expand(*out.shape)).mean(axis = 0).min(dim = 0)
+                    _loss, _index = Loss(input = out, target = torch.tensor(opt_sol, dtype = torch.float).unsqueeze(-1).expand(*out.shape)).sum(axis = 0).min(dim = 0)
                     if mode == 'train':
                         train_best_map_hist[_index.item()] += 1
                     else:
                         valid_best_map_hist[_index.item()] += 1
-                    loss, num_node = loss + _loss, num_node + 1
+                    loss, num_node, num_var = loss + _loss, num_node + 1, num_var + qip.NumVars
                     
                     # generate the child nodes
                     for proposal in proposals:
@@ -176,7 +176,7 @@ if __name__ == '__main__':
                     break
 
             # compute the overall loss
-            loss = loss / num_node
+            loss = loss / num_var
             
             # do backprop if it is a training instance
             if mode == 'train':
