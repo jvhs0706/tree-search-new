@@ -134,9 +134,11 @@ if __name__ == '__main__':
         if mode == 'train':
             idx = np.random.randint(num_training_instances)
             ip_instance = load_instance(f'{train_dir}/instance_{idx+1}.lp') 
+            model.train()
         else: 
             idx = np.random.randint(num_validation_instances)
             ip_instance = load_instance(f'{valid_dir}/instance_{idx+1}.lp') 
+            model.eval()
         
         tree_height, num_node = 0, 0
         root_node = assign_values(ip_instance, [], [])
@@ -203,19 +205,20 @@ if __name__ == '__main__':
         'constraint_features': args.constraint_features,
         'edge_features': args.edge_features,
         'num_prob_map': args.num_prob_map, 
-        'batch_norm': args.batch_norm,
-        'threshold_prob_0': args.threshold_prob_0,
-        'threshold_prob_1': args.threshold_prob_1,
-        'accelerated': True
+        'batch_norm': args.batch_norm
     }
+
     with open(model_dir +'/model_config.json', 'w') as f:
         json.dump(model_config, f)
-    
+
     training_config = {
         'num_step': args.num_training,
         'learning_rate': args.learning_rate,
         'step_size': args.step_size,
-        'gamma': args.gamma
+        'gamma': args.gamma,
+        'threshold_prob_0': args.threshold_prob_0,
+        'threshold_prob_1': args.threshold_prob_1,
+        'accelerated': True
     }
     with open(model_dir +'/training_config.json', 'w') as f:
         json.dump(training_config, f)

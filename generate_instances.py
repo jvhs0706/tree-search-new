@@ -38,69 +38,101 @@ if __name__ == '__main__':
         denss = []
 
         # train instances
-        n = 10000
-        lp_dir = f'data/instances/setcover/train_{nrows}r_{ncols}c_{dens}d'
-        print(f"{n} instances in {lp_dir}")
-        os.makedirs(lp_dir)
-        filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
-        nrowss.extend([nrows] * n)
-        ncolss.extend([ncols] * n)
-        denss.extend([dens] * n)
+        try:
+            n = 10000
+            lp_dir = f'data/instances/setcover/train_{nrows}r_{ncols}c_{dens}d'
+            print(f"{n} instances in {lp_dir}")
+            os.makedirs(lp_dir)
+            filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
+            nrowss.extend([nrows] * n)
+            ncolss.extend([ncols] * n)
+            denss.extend([dens] * n)
+        except FileExistsError:
+            print(f'{lp_dir} already exists!')
 
         # validation instances
-        n = 2000
-        lp_dir = f'data/instances/setcover/valid_{nrows}r_{ncols}c_{dens}d'
-        print(f"{n} instances in {lp_dir}")
-        os.makedirs(lp_dir)
-        filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
-        nrowss.extend([nrows] * n)
-        ncolss.extend([ncols] * n)
-        denss.extend([dens] * n)
-
-        # small transfer instances
-        n = 100
-        nrows = 500
-        lp_dir = f'data/instances/setcover/transfer_{nrows}r_{ncols}c_{dens}d'
-        print(f"{n} instances in {lp_dir}")
-        os.makedirs(lp_dir)
-        filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
-        nrowss.extend([nrows] * n)
-        ncolss.extend([ncols] * n)
-        denss.extend([dens] * n)
+        try:
+            n = 2000
+            lp_dir = f'data/instances/setcover/valid_{nrows}r_{ncols}c_{dens}d'
+            print(f"{n} instances in {lp_dir}")
+            os.makedirs(lp_dir)
+            filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
+            nrowss.extend([nrows] * n)
+            ncolss.extend([ncols] * n)
+            denss.extend([dens] * n)
+        except FileExistsError:
+            print(f'{lp_dir} already exists!')
 
         # medium transfer instances
-        n = 100
-        nrows = 1000
-        lp_dir = f'data/instances/setcover/transfer_{nrows}r_{ncols}c_{dens}d'
-        print(f"{n} instances in {lp_dir}")
-        os.makedirs(lp_dir)
-        filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
-        nrowss.extend([nrows] * n)
-        ncolss.extend([ncols] * n)
-        denss.extend([dens] * n)
+        try:
+            n = 100
+            nrows = 1000
+            lp_dir = f'data/instances/setcover/transfer_{nrows}r_{ncols}c_{dens}d'
+            print(f"{n} instances in {lp_dir}")
+            os.makedirs(lp_dir)
+            filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
+            nrowss.extend([nrows] * n)
+            ncolss.extend([ncols] * n)
+            denss.extend([dens] * n)
+        except FileExistsError:
+            print(f'{lp_dir} already exists!')
 
         # big transfer instances
-        n = 100
-        nrows = 2000
-        lp_dir = f'data/instances/setcover/transfer_{nrows}r_{ncols}c_{dens}d'
-        print(f"{n} instances in {lp_dir}")
-        os.makedirs(lp_dir)
-        filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
-        nrowss.extend([nrows] * n)
-        ncolss.extend([ncols] * n)
-        denss.extend([dens] * n)
+        try:
+            n = 100
+            nrows = 2000
+            lp_dir = f'data/instances/setcover/transfer_{nrows}r_{ncols}c_{dens}d'
+            print(f"{n} instances in {lp_dir}")
+            os.makedirs(lp_dir)
+            filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
+            nrowss.extend([nrows] * n)
+            ncolss.extend([ncols] * n)
+            denss.extend([dens] * n)
+        except FileExistsError:
+            print(f'{lp_dir} already exists!')
 
         # test instances
-        n = 2000
-        nrows = 500
-        ncols = 1000
-        lp_dir = f'data/instances/setcover/test_{nrows}r_{ncols}c_{dens}d'
-        print(f"{n} instances in {lp_dir}")
-        os.makedirs(lp_dir)
-        filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
-        nrowss.extend([nrows] * n)
-        ncolss.extend([ncols] * n)
-        denss.extend([dens] * n)
+        try:
+            n = 2000
+            nrows = 500
+            ncols = 1000
+            lp_dir = f'data/instances/setcover/test_{nrows}r_{ncols}c_{dens}d'
+            print(f"{n} instances in {lp_dir}")
+            os.makedirs(lp_dir)
+            filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
+            nrowss.extend([nrows] * n)
+            ncolss.extend([ncols] * n)
+            denss.extend([dens] * n)
+        except FileExistsError:
+            print(f'{lp_dir} already exists!')
+
+        # medium test instances
+        try:
+            n = 100
+            nrows = 1000
+            lp_dir = f'data/instances/setcover/test_{nrows}r_{ncols}c_{dens}d'
+            print(f"{n} instances in {lp_dir}")
+            os.makedirs(lp_dir)
+            filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
+            nrowss.extend([nrows] * n)
+            ncolss.extend([ncols] * n)
+            denss.extend([dens] * n)
+        except FileExistsError:
+            print(f'{lp_dir} already exists!')
+
+        # big test instances
+        try:
+            n = 100
+            nrows = 2000
+            lp_dir = f'data/instances/setcover/test_{nrows}r_{ncols}c_{dens}d'
+            print(f"{n} instances in {lp_dir}")
+            os.makedirs(lp_dir)
+            filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
+            nrowss.extend([nrows] * n)
+            ncolss.extend([ncols] * n)
+            denss.extend([dens] * n)
+        except FileExistsError:
+            print(f'{lp_dir} already exists!')
 
         # actually generate the instances
         for filename, nrows, ncols, dens in zip(filenames, nrowss, ncolss, denss):
@@ -117,56 +149,87 @@ if __name__ == '__main__':
         nnodess = []
 
         # train instances
-        n = 10000
-        lp_dir = f'data/instances/indset/train_{number_of_nodes}_{affinity}'
-        print(f"{n} instances in {lp_dir}")
-        os.makedirs(lp_dir)
-        filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
-        nnodess.extend([number_of_nodes] * n)
+        try:
+            n = 10000
+            lp_dir = f'data/instances/indset/train_{number_of_nodes}_{affinity}'
+            print(f"{n} instances in {lp_dir}")
+            os.makedirs(lp_dir)
+            filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
+            nnodess.extend([number_of_nodes] * n)
+        except FileExistsError:
+            print(f'{lp_dir} already exists!')
 
         # validation instances
-        n = 2000
-        lp_dir = f'data/instances/indset/valid_{number_of_nodes}_{affinity}'
-        print(f"{n} instances in {lp_dir}")
-        os.makedirs(lp_dir)
-        filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
-        nnodess.extend([number_of_nodes] * n)
-
-        # small transfer instances
-        n = 100
-        number_of_nodes = 500
-        lp_dir = f'data/instances/indset/transfer_{number_of_nodes}_{affinity}'
-        print(f"{n} instances in {lp_dir}")
-        os.makedirs(lp_dir)
-        filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
-        nnodess.extend([number_of_nodes] * n)
+        try:
+            n = 2000
+            lp_dir = f'data/instances/indset/valid_{number_of_nodes}_{affinity}'
+            print(f"{n} instances in {lp_dir}")
+            os.makedirs(lp_dir)
+            filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
+            nnodess.extend([number_of_nodes] * n)
+        except FileExistsError:
+            print(f'{lp_dir} already exists!')
 
         # medium transfer instances
-        n = 100
-        number_of_nodes = 1000
-        lp_dir = f'data/instances/indset/transfer_{number_of_nodes}_{affinity}'
-        print(f"{n} instances in {lp_dir}")
-        os.makedirs(lp_dir)
-        filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
-        nnodess.extend([number_of_nodes] * n)
+        try:
+            n = 100
+            number_of_nodes = 1000
+            lp_dir = f'data/instances/indset/transfer_{number_of_nodes}_{affinity}'
+            print(f"{n} instances in {lp_dir}")
+            os.makedirs(lp_dir)
+            filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
+            nnodess.extend([number_of_nodes] * n)
+        except FileExistsError:
+            print(f'{lp_dir} already exists!')
 
         # big transfer instances
-        n = 100
-        number_of_nodes = 1500
-        lp_dir = f'data/instances/indset/transfer_{number_of_nodes}_{affinity}'
-        print(f"{n} instances in {lp_dir}")
-        os.makedirs(lp_dir)
-        filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
-        nnodess.extend([number_of_nodes] * n)
+        try:
+            n = 100
+            number_of_nodes = 1500
+            lp_dir = f'data/instances/indset/transfer_{number_of_nodes}_{affinity}'
+            print(f"{n} instances in {lp_dir}")
+            os.makedirs(lp_dir)
+            filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
+            nnodess.extend([number_of_nodes] * n)
+        except FileExistsError:
+            print(f'{lp_dir} already exists!')
+
 
         # test instances
-        n = 2000
-        number_of_nodes = 500
-        lp_dir = f'data/instances/indset/test_{number_of_nodes}_{affinity}'
-        print(f"{n} instances in {lp_dir}")
-        os.makedirs(lp_dir)
-        filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
-        nnodess.extend([number_of_nodes] * n)
+        try:
+            n = 2000
+            number_of_nodes = 500
+            lp_dir = f'data/instances/indset/test_{number_of_nodes}_{affinity}'
+            print(f"{n} instances in {lp_dir}")
+            os.makedirs(lp_dir)
+            filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
+            nnodess.extend([number_of_nodes] * n)
+        except FileExistsError:
+            print(f'{lp_dir} already exists!')
+
+        # medium test instances
+        try:
+            n = 100
+            number_of_nodes = 1000
+            lp_dir = f'data/instances/indset/test_{number_of_nodes}_{affinity}'
+            print(f"{n} instances in {lp_dir}")
+            os.makedirs(lp_dir)
+            filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
+            nnodess.extend([number_of_nodes] * n)
+        except FileExistsError:
+            print(f'{lp_dir} already exists!')
+
+        # big test instances
+        try:
+            n = 100
+            number_of_nodes = 1500
+            lp_dir = f'data/instances/indset/test_{number_of_nodes}_{affinity}'
+            print(f"{n} instances in {lp_dir}")
+            os.makedirs(lp_dir)
+            filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
+            nnodess.extend([number_of_nodes] * n)
+        except FileExistsError:
+            print(f'{lp_dir} already exists!')
 
         # actually generate the instances
         for filename, nnodes in zip(filenames, nnodess):
@@ -184,66 +247,98 @@ if __name__ == '__main__':
         nbidss = []
 
         # train instances
-        n = 10000
-        lp_dir = f'data/instances/cauctions/train_{number_of_items}_{number_of_bids}'
-        print(f"{n} instances in {lp_dir}")
-        os.makedirs(lp_dir)
-        filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
-        nitemss.extend([number_of_items] * n)
-        nbidss.extend([number_of_bids ] * n)
+        try:
+            n = 10000
+            lp_dir = f'data/instances/cauctions/train_{number_of_items}_{number_of_bids}'
+            print(f"{n} instances in {lp_dir}")
+            os.makedirs(lp_dir)
+            filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
+            nitemss.extend([number_of_items] * n)
+            nbidss.extend([number_of_bids ] * n)
+        except FileExistsError:
+            print(f'{lp_dir} already exists!')
 
         # validation instances
-        n = 2000
-        lp_dir = f'data/instances/cauctions/valid_{number_of_items}_{number_of_bids}'
-        print(f"{n} instances in {lp_dir}")
-        os.makedirs(lp_dir)
-        filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
-        nitemss.extend([number_of_items] * n)
-        nbidss.extend([number_of_bids ] * n)
-
-        # small transfer instances
-        n = 100
-        number_of_items = 100
-        number_of_bids = 500
-        lp_dir = f'data/instances/cauctions/transfer_{number_of_items}_{number_of_bids}'
-        print(f"{n} instances in {lp_dir}")
-        os.makedirs(lp_dir)
-        filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
-        nitemss.extend([number_of_items] * n)
-        nbidss.extend([number_of_bids ] * n)
+        try:
+            n = 2000
+            lp_dir = f'data/instances/cauctions/valid_{number_of_items}_{number_of_bids}'
+            print(f"{n} instances in {lp_dir}")
+            os.makedirs(lp_dir)
+            filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
+            nitemss.extend([number_of_items] * n)
+            nbidss.extend([number_of_bids ] * n)
+        except FileExistsError:
+            print(f'{lp_dir} already exists!')
 
         # medium transfer instances
-        n = 100
-        number_of_items = 200
-        number_of_bids = 1000
-        lp_dir = f'data/instances/cauctions/transfer_{number_of_items}_{number_of_bids}'
-        print(f"{n} instances in {lp_dir}")
-        os.makedirs(lp_dir)
-        filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
-        nitemss.extend([number_of_items] * n)
-        nbidss.extend([number_of_bids ] * n)
+        try:
+            n = 100
+            number_of_items = 200
+            number_of_bids = 1000
+            lp_dir = f'data/instances/cauctions/transfer_{number_of_items}_{number_of_bids}'
+            print(f"{n} instances in {lp_dir}")
+            os.makedirs(lp_dir)
+            filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
+            nitemss.extend([number_of_items] * n)
+            nbidss.extend([number_of_bids ] * n)
+        except FileExistsError:
+            print(f'{lp_dir} already exists!')
 
         # big transfer instances
-        n = 100
-        number_of_items = 300
-        number_of_bids = 1500
-        lp_dir = f'data/instances/cauctions/transfer_{number_of_items}_{number_of_bids}'
-        print(f"{n} instances in {lp_dir}")
-        os.makedirs(lp_dir)
-        filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
-        nitemss.extend([number_of_items] * n)
-        nbidss.extend([number_of_bids ] * n)
+        try:
+            n = 100
+            number_of_items = 300
+            number_of_bids = 1500
+            lp_dir = f'data/instances/cauctions/transfer_{number_of_items}_{number_of_bids}'
+            print(f"{n} instances in {lp_dir}")
+            os.makedirs(lp_dir)
+            filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
+            nitemss.extend([number_of_items] * n)
+            nbidss.extend([number_of_bids ] * n)
+        except FileExistsError:
+            print(f'{lp_dir} already exists!')
 
         # test instances
-        n = 2000
-        number_of_items = 100
-        number_of_bids = 500
-        lp_dir = f'data/instances/cauctions/test_{number_of_items}_{number_of_bids}'
-        print(f"{n} instances in {lp_dir}")
-        os.makedirs(lp_dir)
-        filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
-        nitemss.extend([number_of_items] * n)
-        nbidss.extend([number_of_bids ] * n)
+        try:
+            n = 2000
+            number_of_items = 100
+            number_of_bids = 500
+            lp_dir = f'data/instances/cauctions/test_{number_of_items}_{number_of_bids}'
+            print(f"{n} instances in {lp_dir}")
+            os.makedirs(lp_dir)
+            filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
+            nitemss.extend([number_of_items] * n)
+            nbidss.extend([number_of_bids ] * n)
+        except FileExistsError:
+            print(f'{lp_dir} already exists!')
+
+        # medium test instances
+        try:
+            n = 100
+            number_of_items = 200
+            number_of_bids = 1000
+            lp_dir = f'data/instances/cauctions/test_{number_of_items}_{number_of_bids}'
+            print(f"{n} instances in {lp_dir}")
+            os.makedirs(lp_dir)
+            filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
+            nitemss.extend([number_of_items] * n)
+            nbidss.extend([number_of_bids ] * n)
+        except FileExistsError:
+            print(f'{lp_dir} already exists!')
+
+        # big test instances
+        try:
+            n = 100
+            number_of_items = 300
+            number_of_bids = 1500
+            lp_dir = f'data/instances/cauctions/test_{number_of_items}_{number_of_bids}'
+            print(f"{n} instances in {lp_dir}")
+            os.makedirs(lp_dir)
+            filenames.extend([f'{lp_dir}/instance_{i+1}.lp' for i in range(n)])
+            nitemss.extend([number_of_items] * n)
+            nbidss.extend([number_of_bids ] * n)
+        except FileExistsError:
+            print(f'{lp_dir} already exists!')
 
         # actually generate the instances
         for filename, nitems, nbids in zip(filenames, nitemss, nbidss):

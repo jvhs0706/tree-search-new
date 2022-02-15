@@ -81,6 +81,7 @@ if __name__ == '__main__':
     model = Model(v_dim=len(model_config['variable_features']), c_dim=len(model_config['constraint_features']), 
         e_dim=len(model_config['edge_features']), K = model_config['num_prob_map'], bn = model_config['batch_norm'])
     model.load_state_dict(torch.load(model_dir + '/model_state_dict'))
+    model.eval()
     encoder = BinaryIPEncoder(*['v_'+feat for feat in model_config['variable_features']], *['c_'+feat for feat in model_config['constraint_features']], *['e_'+feat for feat in model_config['edge_features']])    
     
     # keeping the running time and performance

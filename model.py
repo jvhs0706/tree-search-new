@@ -77,7 +77,7 @@ class Model(nn.Module):
         
         if mode == 'test':
             with torch.no_grad():
-                self.eval()
+                # self.eval()
                 V, C, E = encoder(ip)
                 probs = self(V, C, E).cpu().numpy() # (n, K)
                 n, K = probs.shape
@@ -87,7 +87,7 @@ class Model(nn.Module):
         
         elif mode == 'valid':
             with torch.no_grad():
-                self.eval()
+                # self.eval()
                 V, C, E = encoder(ip)
                 probs = self(V, C, E) # (n, K)
                 n, K = probs.shape
@@ -96,7 +96,7 @@ class Model(nn.Module):
                 return probs, proposals
         
         elif mode == 'train':
-            self.train()
+            # self.train()
             V, C, E = encoder(ip)
             probs = self(V, C, E) # (n, K)
             with torch.no_grad():
@@ -113,7 +113,7 @@ class Model(nn.Module):
         assert 0.0 <= p0 < p1 <= 1.0
         if mode == 'test':
             with torch.no_grad():
-                self.eval()
+                # self.eval()
                 V, C, E = encoder.encode_batch(ips)
                 out = self(V, C, E).cpu().numpy()
                 _, K = out.shape
@@ -126,7 +126,7 @@ class Model(nn.Module):
         
         elif mode == 'valid':
             with torch.no_grad():
-                self.eval()
+                # self.eval()
                 V, C, E = encoder.encode_batch(ips)
                 out = self(V, C, E)
                 _, K = out.shape
@@ -140,7 +140,7 @@ class Model(nn.Module):
                 return out, probs, proposals_batch
 
         elif mode == 'train':
-            self.train()
+            # self.train()
             V, C, E = encoder.encode_batch(ips)
             out = self(V, C, E)
             with torch.no_grad():

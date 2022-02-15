@@ -7,7 +7,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import os
-os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 import argparse
 import numpy as np
 import json
@@ -139,9 +138,11 @@ if __name__ == '__main__':
         if mode == 'train':
             idx = np.random.randint(num_training_instances)
             ip_instance = load_instance(f'{train_dir}/instance_{idx+1}.lp') 
+            model.train()
         else: 
             idx = np.random.randint(num_validation_instances)
             ip_instance = load_instance(f'{valid_dir}/instance_{idx+1}.lp') 
+            model.eval()
 
         num_node, num_var = 0, 0
         root_node = assign_values(ip_instance, [], [])
@@ -198,19 +199,20 @@ if __name__ == '__main__':
         'constraint_features': args.constraint_features,
         'edge_features': args.edge_features,
         'num_prob_map': args.num_prob_map, 
-        'batch_norm': args.batch_norm,
-        'threshold_prob_0': args.threshold_prob_0,
-        'threshold_prob_1': args.threshold_prob_1,
-        'accelerated': False
+        'batch_norm': args.batch_norm
     }
+
     with open(model_dir +'/model_config.json', 'w') as f:
         json.dump(model_config, f)
-    
+
     training_config = {
         'num_step': args.num_training,
         'learning_rate': args.learning_rate,
         'step_size': args.step_size,
-        'gamma': args.gamma
+        'gamma': args.gamma,
+        'threshold_prob_0': args.threshold_prob_0,
+        'threshold_prob_1': args.threshold_prob_1,
+        'accelerated': False
     }
     with open(model_dir +'/training_config.json', 'w') as f:
         json.dump(training_config, f)
@@ -219,7 +221,7 @@ if __name__ == '__main__':
 
     # summarize the history of loss and the tree size
     loss_hist, num_node_hist, training_mask = np.array(loss_hist), np.array(num_node_hist), np.array(training_mask)
-    f, axes = plt.subplots(1, 2, constrained_layout=True)
+    fig, axes = plt.subplots(1, 2, constrained_layout=True)
     axes[0].set_title('Loss history')
     axes[0].plot(np.arange(args.num_training + args.num_validation)[training_mask], loss_hist[training_mask], label = 'train')
     axes[0].plot(np.arange(args.num_training + args.num_validation)[~training_mask], loss_hist[~training_mask], label = 'valid')
@@ -230,10 +232,10 @@ if __name__ == '__main__':
     axes[1].plot(np.arange(args.num_training + args.num_validation)[~training_mask], num_node_hist[~training_mask], label = 'valid')
     axes[1].legend()
     
-    f.savefig(model_dir + '/training_hist.png')
+    fig.savefig(model_dir + '/training_hist.png')
     
     # summarize the history of best maps
-    f, axes = plt.subplots(1, 2, constrained_layout=True)
+    fig, axes = plt.subplots(1, 2, constrained_layout=True)
     axes[0].set_title('train')
     axes[0].pie(train_best_map_hist, labels = np.arange(len(train_best_map_hist)))
     axes[0].legend()
@@ -242,4 +244,4 @@ if __name__ == '__main__':
     axes[1].pie(valid_best_map_hist, labels = np.arange(len(valid_best_map_hist)))
     axes[1].legend()
 
-    f.savefig(model_dir + '/best_map_hist.png')
+    fig.savefig(model_dir + '/best_map_hist.png')
