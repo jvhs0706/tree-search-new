@@ -105,11 +105,13 @@ if __name__ == '__main__':
         type = float,
         default = 1.0
     )
+    parser.add_argument(
+        '-d', '--device',
+        help = 'The device for pytorch.',
+        default = 'cuda' if torch.cuda.is_available() else 'cpu',
+        type = torch.device
+    )
     args = parser.parse_args()
-
-    # use gpu if available
-    if torch.cuda.is_available():
-        torch.set_default_tensor_type('torch.cuda.FloatTensor')
     
     # data directories
     data_dir = f'data/instances/{args.problem}'
@@ -121,8 +123,8 @@ if __name__ == '__main__':
     num_validation_instances = len(os.listdir(valid_dir))
 
     # initialize the model, the encoder, the optimizer, the scheduler, and the loss function
-    model = Model(v_dim=len(args.variable_features), c_dim=len(args.constraint_features), e_dim=len(args.edge_features), K = args.num_prob_map, bn = args.batch_norm)
-    encoder = BinaryIPEncoder(*['v_'+feat for feat in args.variable_features], *['c_'+feat for feat in args.constraint_features], *['e_'+feat for feat in args.edge_features])
+    model = Model(v_dim=len(args.variable_features), c_dim=len(args.constraint_features), e_dim=len(args.edge_features), K = args.num_prob_map, bn = args.batch_norm).to(args.device)
+    encoder = BinaryIPEncoder(*['v_'+feat for feat in args.variable_features], *['c_'+feat for feat in args.constraint_features], *['e_'+feat for feat in args.edge_features], device = args.device)
     optimizer = torch.optim.Adam(model.parameters(), lr = args.learning_rate)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.step_size, args.gamma)
     Loss = torch.nn.BCELoss(reduction = 'none')
@@ -133,6 +135,8 @@ if __name__ == '__main__':
     # the history of loss, the tree height, and the tree size will be kept
     loss_hist, num_node_hist, training_mask = [], [], []
     train_best_map_hist, valid_best_map_hist = np.array([0] * args.num_prob_map), np.array([0] * args.num_prob_map)
+
+    print(f'Using device {args.device}...')
     
     for i, mode in enumerate(splitter):
         if mode == 'train':
@@ -157,7 +161,7 @@ if __name__ == '__main__':
                     # compute the loss for one node
                     out, proposals = model.predictor(qip, encoder, p0 = args.threshold_prob_0, p1 = args.threshold_prob_1, mode = mode)
                     opt_sol, _ = solve_instance(qip, OutputFlag = 0)
-                    _loss, _index = Loss(input = out, target = torch.tensor(opt_sol, dtype = torch.float).unsqueeze(-1).expand(*out.shape)).sum(axis = 0).min(dim = 0)
+                    _loss, _index = Loss(input = out, target = torch.tensor(opt_sol, dtype = torch.float, device = args.device).unsqueeze(-1).expand(*out.shape)).sum(axis = 0).min(dim = 0)
                     if mode == 'train':
                         train_best_map_hist[_index.item()] += 1
                     else:

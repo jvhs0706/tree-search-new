@@ -23,4 +23,6 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
     model_dir = f'models/'+ '_'.join([args.problem] + args.problem_params)
-    shutil.make_archive(model_dir + ' ' + datetime.now().strftime('%Y-%m-%d %H%M%S') + (' '+'_'.join(args.remarks) if args.remarks is not None else ''), 'zip', model_dir)
+    if not os.path.isdir('models/archive'):
+        os.makedirs('models/archive')
+    shutil.make_archive('models/archive/' + '_'.join([args.problem] + args.problem_params) + ' ' + datetime.now().strftime('%Y-%m-%d %H%M%S') + (' '+'_'.join(args.remarks) if args.remarks is not None else ''), 'zip', model_dir)

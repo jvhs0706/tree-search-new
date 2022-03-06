@@ -27,6 +27,11 @@ if __name__ == '__main__':
         nargs = '*'
     )
     parser.add_argument(
+        '-min', '--minimize',
+        help = 'If specified, the sense of the problem is minimization, otherwise maximization.',
+        action = 'store_true'
+    )
+    parser.add_argument(
         '-p0', '--threshold_prob_0',
         help = 'Threshold value for predicting 0.',
         type = float, 
@@ -51,6 +56,12 @@ if __name__ == '__main__':
         default = np.inf
     )
     parser.add_argument(
+        '-T', '--time_limit', 
+        help = 'Time limit for solving an instance using Gurobi (s).',
+        type = float,
+        default = np.inf
+    )
+    parser.add_argument(
         '-n', '--first_num_instances',
         help = 'Only considering the first few instances.',
         type = int,
@@ -60,12 +71,13 @@ if __name__ == '__main__':
         help = 'Accerelate by computing multiple problems at the same depth.', 
         action = 'store_true'
     )
-
+    parser.add_argument(
+        '-d', '--device',
+        help = 'The device for pytorch.',
+        default = 'cuda' if torch.cuda.is_available() else 'cpu',
+        type = torch.device
+    )
     args = parser.parse_args()
-
-    # use gpu if available
-    if torch.cuda.is_available():
-        torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
     # load data
     data_dir = f'data/instances/{args.problem}'
@@ -79,17 +91,19 @@ if __name__ == '__main__':
     with open(model_dir +'/model_config.json', 'r') as f:
         model_config = json.load(f)
     model = Model(v_dim=len(model_config['variable_features']), c_dim=len(model_config['constraint_features']), 
-        e_dim=len(model_config['edge_features']), K = model_config['num_prob_map'], bn = model_config['batch_norm'])
+        e_dim=len(model_config['edge_features']), K = model_config['num_prob_map'], bn = model_config['batch_norm']).to(args.device)
     model.load_state_dict(torch.load(model_dir + '/model_state_dict'))
     model.eval()
-    encoder = BinaryIPEncoder(*['v_'+feat for feat in model_config['variable_features']], *['c_'+feat for feat in model_config['constraint_features']], *['e_'+feat for feat in model_config['edge_features']])    
+    encoder = BinaryIPEncoder(*['v_'+feat for feat in model_config['variable_features']], *['c_'+feat for feat in model_config['constraint_features']], *['e_'+feat for feat in model_config['edge_features']], device = args.device)    
     
     # keeping the running time and performance
     solver_time, gurobi_time = 0.0, 0.0
-    solved = 0
+    solved, incumbent = 0, 0
     gap, gap_ratio = 0.0, 0.0
+    epsilon = 1e-6
     
     # testing loop: will be timed
+    sense = 1 if args.minimize else -1
     with torch.no_grad():
         for i in range(num_testing_instances):
             ip_instance = load_instance(f'{test_dir}/instance_{i+1}.lp')
@@ -105,17 +119,20 @@ if __name__ == '__main__':
             solver_time += (toc - tic)
 
             tic = time.time()
-            _, opt_obj_val = solve_instance(ip_instance, OutputFlag = 0, Threads = 1)
+            _, grb_obj_val = solve_instance(ip_instance, OutputFlag = 0, Threads = 1, TimeLimit = args.time_limit)
             toc = time.time()
             gurobi_time += (toc - tic)
 
             if np.abs(obj_val) < np.inf:
                 solved += 1
-                gap += abs(obj_val - opt_obj_val)
-                gap_ratio += abs((obj_val - opt_obj_val)/opt_obj_val)
+                gap += sense * (obj_val - grb_obj_val)
+                gap_ratio += sense * (obj_val - grb_obj_val)/grb_obj_val
+                incumbent += sense * obj_val <= sense * grb_obj_val + epsilon
     
     # print the statistics
     print(f'Average running time: solver {solver_time / num_testing_instances:.3f} s, gurobi {gurobi_time / num_testing_instances:.3f} s.')
     print(f'Solved: {solved} out of {num_testing_instances}.')
     print(f'Average gap {gap / solved}, average normalized gap {gap_ratio / solved}.')
+    print(f'Incumbent: {incumbent} out of {num_testing_instances}.')
+    print()
     

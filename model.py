@@ -47,6 +47,16 @@ class HalfConv(nn.Module):
         return out
 
 class Model(nn.Module):
+    @staticmethod
+    def avoid_repeat_code(proposal, gradient_mode = False):
+        indices, values = proposal
+        if gradient_mode:
+            indices, values = indices.cpu().numpy(), values.cpu().numpy()
+        out = np.repeat('?', indices.max() + 1)
+        out[indices] = np.vectorize(lambda z: '1' if z else '0')(values)
+        return ''.join(out)
+
+
     def __init__(self, v_dim: int, c_dim: int, e_dim: int, K: int, bn: bool = False):
         '''
         v_dim: dimension of variable feature vectors
@@ -82,7 +92,14 @@ class Model(nn.Module):
                 probs = self(V, C, E).cpu().numpy() # (n, K)
                 n, K = probs.shape
                 mask = np.logical_or(probs < p0, probs > p1)
-                proposals = [(np.arange(n)[mask[:, k]], probs[mask[:, k], k] > (p1 + p0)/2) for k in range(K) if mask[:, k].sum() > 0]
+                proposals, proposal_unique_codes = [], set()
+                for k in range(K):
+                    if mask[:, k].sum() > 0:
+                        proposal = (np.arange(n)[mask[:, k]], probs[mask[:, k], k] > (p1 + p0)/2)
+                        unique_code = Model.avoid_repeat_code(proposal)
+                        if unique_code not in proposal_unique_codes:
+                            proposal_unique_codes.add(unique_code)
+                            proposals.append(proposal)
                 return proposals
         
         elif mode == 'valid':
@@ -91,8 +108,15 @@ class Model(nn.Module):
                 V, C, E = encoder(ip)
                 probs = self(V, C, E) # (n, K)
                 n, K = probs.shape
-                mask = torch.logical_or(probs < p0, probs > p1)
-                proposals = [(torch.arange(n)[mask[:, k]], probs[mask[:, k], k] > (p1 + p0)/2) for k in range(K) if mask[:, k].sum() > 0]
+                mask = torch.logical_or(probs < p0, probs > p1).cpu().numpy()
+                proposals, proposal_unique_codes = [], set()
+                for k in range(K):
+                    if mask[:, k].sum() > 0:
+                        proposal = (torch.arange(n)[mask[:, k]], probs[mask[:, k], k] > (p1 + p0)/2)
+                        unique_code = Model.avoid_repeat_code(proposal, True)
+                        if unique_code not in proposal_unique_codes:
+                            proposal_unique_codes.add(unique_code)
+                            proposals.append(proposal)
                 return probs, proposals
         
         elif mode == 'train':
@@ -102,7 +126,14 @@ class Model(nn.Module):
             with torch.no_grad():
                 n, K = probs.shape
                 mask = torch.logical_or(probs < p0, probs > p1)
-                proposals = [(torch.arange(n)[mask[:, k]], probs[mask[:, k], k] > (p1 + p0)/2) for k in range(K) if mask[:, k].sum() > 0]
+                proposals, proposal_unique_codes = [], set()
+                for k in range(K):
+                    if mask[:, k].sum() > 0:
+                        proposal = (torch.arange(n)[mask[:, k]], probs[mask[:, k], k] > (p1 + p0)/2)
+                        unique_code = Model.avoid_repeat_code(proposal, True)
+                        if unique_code not in proposal_unique_codes:
+                            proposal_unique_codes.add(unique_code)
+                            proposals.append(proposal)
             return probs, proposals
         
         else:
@@ -120,37 +151,24 @@ class Model(nn.Module):
                 indices = np.cumsum([0] + [ip.NumVars for ip in ips])
                 mask = np.logical_or(out < p0, out > p1)
                 for i, ip in enumerate(ips):
-                    _out, _mask = out[indices[i]: indices[i+1]], mask[indices[i]: indices[i+1]]
-                    proposals_batch.append([(np.arange(ips[i].numVars)[_mask[:, k]], (_out[_mask[:, k], k] > (p1 + p0)/2)) for k in range(K) if _mask[:, k].sum() > 0])
+                    instance_out, instance_mask = out[indices[i]: indices[i+1]], mask[indices[i]: indices[i+1]]
+                    proposals, proposal_unique_codes = [], set()
+                    for k in range(K):
+                        if instance_mask[:, k].sum() > 0:
+                            proposal = (np.arange(ips[i].numVars)[instance_mask[:, k]], instance_out[instance_mask[:, k], k] > (p1 + p0)/2)
+                            unique_code = Model.avoid_repeat_code(proposal)
+                            if unique_code not in proposal_unique_codes:
+                                proposal_unique_codes.add(unique_code)
+                                proposals.append(proposal)
+                    proposals_batch.append(proposals)
                 return proposals_batch
         
         elif mode == 'valid':
-            with torch.no_grad():
-                # self.eval()
-                V, C, E = encoder.encode_batch(ips)
-                out = self(V, C, E)
-                _, K = out.shape
-                indices = np.cumsum([0] + [ip.NumVars for ip in ips])
-                mask = torch.logical_or(out < p0, out > p1)
-                probs = []
-                for i, ip in enumerate(ips):
-                    _out, _mask = out[indices[i]: indices[i+1]], mask[indices[i]: indices[i+1]]
-                    proposals_batch.append([(torch.arange(ips[i].numVars)[_mask[:, k]], _out[_mask[:, k], k] > (p1 + p0)/2) for k in range(K) if _mask[:, k].sum() > 0])
-                    probs.append(_out)
-                return out, probs, proposals_batch
+            raise NotImplementedError
 
         elif mode == 'train':
-            # self.train()
-            V, C, E = encoder.encode_batch(ips)
-            out = self(V, C, E)
-            with torch.no_grad():
-                _, K = out.shape
-                indices = np.cumsum([0] + [ip.NumVars for ip in ips])
-                mask = torch.logical_or(out < p0, out > p1)
-                probs = []
-                for i, ip in enumerate(ips):
-                    _out, _mask = out[indices[i]: indices[i+1]], mask[indices[i]: indices[i+1]]
-                    proposals_batch.append([(torch.arange(ips[i].numVars)[_mask[:, k]], _out[_mask[:, k], k] > (p1 + p0)/2) for k in range(K) if _mask[:, k].sum() > 0])
-                    probs.append(_out)
-            return out, probs, proposals_batch
+            raise NotImplementedError
+
+        else:
+            raise TypeError
         

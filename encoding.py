@@ -109,22 +109,24 @@ class BinaryIPEncoder:
         arr = ip.getA().tocoo().data
         return arr
 
-    def __init__(self, *args, epsilon = 1e-8):
+    def __init__(self, *args, device, epsilon = 1e-8):
         '''
         Usage: BinaryIPEncoder('v_feat1', 'v_feat2', ...)
         '''
     
         self.variable_feats = [feat for feat in BinaryIPEncoder.variable_features if f'v_{feat}' in args]
         self.constraint_feats = [feat for feat in BinaryIPEncoder.constraint_features if f'c_{feat}' in args]
-        self.edge_feats = [feat for feat in BinaryIPEncoder.edge_features if f'e_{feat}' in args]        
+        self.edge_feats = [feat for feat in BinaryIPEncoder.edge_features if f'e_{feat}' in args]      
+
+        self.device = device  
 
     def __call__(self, ip):
         lp = BinaryIPEncoder._lp_relax(ip)
         edge_index, prob_size = BinaryIPEncoder._get_topology(ip)
 
-        V = torch.tensor(np.stack([getattr(BinaryIPEncoder, f'encode_v_{feat}')(lp if feat[:2] == 'lp' else ip) for feat in self.variable_feats], axis = -1), dtype = torch.float)
-        C = torch.tensor(np.stack([getattr(BinaryIPEncoder, f'encode_c_{feat}')(lp if feat[:2] == 'lp' else ip) for feat in self.constraint_feats], axis = -1), dtype = torch.float)
-        E = torch.sparse_coo_tensor(edge_index, np.stack([getattr(BinaryIPEncoder, f'encode_e_{feat}')(lp if feat[:2] == 'lp' else ip) for feat in self.edge_feats], -1), (*prob_size, len(self.edge_features)), dtype = torch.float)
+        V = torch.tensor(np.stack([getattr(BinaryIPEncoder, f'encode_v_{feat}')(lp if feat[:2] == 'lp' else ip) for feat in self.variable_feats], axis = -1), dtype = torch.float, device = self.device)
+        C = torch.tensor(np.stack([getattr(BinaryIPEncoder, f'encode_c_{feat}')(lp if feat[:2] == 'lp' else ip) for feat in self.constraint_feats], axis = -1), dtype = torch.float, device = self.device)
+        E = torch.sparse_coo_tensor(edge_index, np.stack([getattr(BinaryIPEncoder, f'encode_e_{feat}')(lp if feat[:2] == 'lp' else ip) for feat in self.edge_feats], -1), (*prob_size, len(self.edge_features)), dtype = torch.float, device = self.device)
         return V, C, E
 
     def encode_batch(self, ips):
@@ -142,7 +144,7 @@ class BinaryIPEncoder:
             
             num_constr, num_var = num_constr + m, num_var + n
     
-        V = torch.tensor(np.concatenate(V, axis = 0), dtype = torch.float)
-        C = torch.tensor(np.concatenate(C, axis = 0), dtype = torch.float)
-        E = torch.sparse_coo_tensor(np.concatenate(E_indices, axis = 1), np.concatenate(E_values, axis = 0), (num_constr, num_var, len(self.edge_features)), dtype = torch.float)
+        V = torch.tensor(np.concatenate(V, axis = 0), dtype = torch.float, device = self.device)
+        C = torch.tensor(np.concatenate(C, axis = 0), dtype = torch.float, device = self.device)
+        E = torch.sparse_coo_tensor(np.concatenate(E_indices, axis = 1), np.concatenate(E_values, axis = 0), (num_constr, num_var, len(self.edge_features)), dtype = torch.float, device = self.device)
         return V, C, E

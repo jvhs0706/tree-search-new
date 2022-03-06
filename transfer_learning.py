@@ -30,21 +30,18 @@ if __name__ == '__main__':
         help = 'Parameters of the source model',
         nargs = '*'
     )
-
     parser.add_argument(
         '-n', '--num_transfer', 
         help = 'Number of transfer learning steps.',
         type = int,
         required = True
     )
-
     parser.add_argument(
         '-c', '--components',
         help = 'Components of the model that are NOT frozen.',
         nargs = '*',
         default = ['tail']
     )
-
     parser.add_argument(
         '-p0', '--threshold_prob_0',
         help = 'Threshold probability for predicting 0.',
@@ -57,14 +54,12 @@ if __name__ == '__main__':
         type = float,
         required = True
     )
-
     parser.add_argument(
         '-M', '--max_num_node',
         help = 'Maximum number of nodes.',
         type = lambda z: int(z) if z is not None else np.inf,
         default = np.inf
     )
-
     parser.add_argument(
         '-lr', '--learning_rate',
         help = 'The (initial) learning rate of the Adam optimizer.',
@@ -83,11 +78,13 @@ if __name__ == '__main__':
         type = float,
         default = 0.5
     )
+    parser.add_argument(
+        '-d', '--device',
+        help = 'The device for pytorch.',
+        default = 'cuda' if torch.cuda.is_available() else 'cpu',
+        type = torch.device
+    )
     args = parser.parse_args()
-
-    # use gpu if available
-    if torch.cuda.is_available():
-        torch.set_default_tensor_type('torch.cuda.FloatTensor')
     
     # data directories
     data_dir = f'data/instances/{args.problem}'
@@ -100,7 +97,7 @@ if __name__ == '__main__':
     source_model_dir = f'models/'+ '_'.join([args.problem] + args.source_model_params)
     with open(f'{source_model_dir}/model_config.json') as f:
         sm_config = json.load(f)
-    model = Model(v_dim=len(sm_config['variable_features']), c_dim=len(sm_config['constraint_features']), e_dim=len(sm_config['edge_features']), K = sm_config['num_prob_map'], bn = sm_config['batch_norm'])
+    model = Model(v_dim=len(sm_config['variable_features']), c_dim=len(sm_config['constraint_features']), e_dim=len(sm_config['edge_features']), K = sm_config['num_prob_map'], bn = sm_config['batch_norm']).to(args.device)
     model.load_state_dict(torch.load(source_model_dir + '/model_state_dict'))
 
     for cname, component in model.named_children():
@@ -109,7 +106,7 @@ if __name__ == '__main__':
             for p in component.parameters():
                 p.requires_grad = False
     
-    encoder = BinaryIPEncoder(*['v_'+feat for feat in sm_config['variable_features']], *['c_'+feat for feat in sm_config['constraint_features']], *['e_'+feat for feat in sm_config['edge_features']])
+    encoder = BinaryIPEncoder(*['v_'+feat for feat in sm_config['variable_features']], *['c_'+feat for feat in sm_config['constraint_features']], *['e_'+feat for feat in sm_config['edge_features']], device = args.device)
     optimizer = torch.optim.Adam(model.parameters(), lr = args.learning_rate)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.step_size, args.gamma)
     Loss = torch.nn.BCELoss(reduction = 'none')
@@ -117,6 +114,8 @@ if __name__ == '__main__':
     # the history of loss, the tree height, and the tree size will be kept
     loss_hist, num_node_hist = [], []
     transfer_best_map_hist = np.array([0] * sm_config['num_prob_map'])
+
+    print(f'Using device {args.device}...')
     
     for i in range(args.num_transfer):
         idx = np.random.randint(num_transfer_instances)
@@ -135,7 +134,7 @@ if __name__ == '__main__':
                     # compute the loss for one node
                     out, proposals = model.predictor(qip, encoder, p0 = args.threshold_prob_0, p1 = args.threshold_prob_1, mode = 'train')
                     opt_sol, _ = solve_instance(qip, OutputFlag = 0)
-                    _loss, _index = Loss(input = out, target = torch.tensor(opt_sol, dtype = torch.float).unsqueeze(-1).expand(*out.shape)).sum(axis = 0).min(dim = 0)
+                    _loss, _index = Loss(input = out, target = torch.tensor(opt_sol, dtype = torch.float, device = args.device).unsqueeze(-1).expand(*out.shape)).sum(axis = 0).min(dim = 0)
                     transfer_best_map_hist[_index.item()] += 1
                     loss, num_node, num_var = loss + _loss, num_node + 1, num_var + qip.NumVars
                     
