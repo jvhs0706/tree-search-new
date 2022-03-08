@@ -1,0 +1,1 @@
+{"num_step": 64, "learning_rate": 0.001, "step_size": 32, "gamma": 0.5, "threshold_prob_0": 0.1, "threshold_prob_1": 0.9, "accelerated": false}
