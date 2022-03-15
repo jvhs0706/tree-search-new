@@ -78,7 +78,7 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '-bn', '--batch_norm', 
-        help = 'Do batch normalization in the model', 
+        help = 'Do batch normalization in the model.', 
         action = 'store_true'
     )
     parser.add_argument(
@@ -86,6 +86,11 @@ if __name__ == '__main__':
         help = 'Maximum number of nodes.',
         type = lambda z: int(z) if z is not None else np.inf,
         default = np.inf
+    )
+    parser.add_argument(
+        '-r', '--random_pop',
+        help = 'Use random pop instead of BFS.',
+        action = 'store_true'
     )
     parser.add_argument(
         '-lr', '--learning_rate',
@@ -152,11 +157,11 @@ if __name__ == '__main__':
         root_node = assign_values(ip_instance, [], [])
 
         if type(root_node) == gp.Model:
-            nodes = deque([root_node])
+            nodes = [root_node] if args.random_pop else deque([root_node])
             loss = torch.tensor(0.0)
 
             while nodes:
-                qip = nodes.popleft()
+                qip = nodes.pop(np.random.randint(len(nodes))) if args.random_pop else nodes.popleft()
                 try:
                     # compute the loss for one node
                     out, proposals = model.predictor(qip, encoder, p0 = args.threshold_prob_0, p1 = args.threshold_prob_1, mode = mode)

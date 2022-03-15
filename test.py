@@ -68,7 +68,12 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '-a', '--accelerate', 
-        help = 'Accerelate by computing multiple problems at the same depth.', 
+        help = 'Accerelate by computing multiple problems at the same depth, this overrides the random_pop.', 
+        action = 'store_true'
+    )
+    parser.add_argument(
+        '-r', '--random_pop',
+        help = 'Use random pop in the normal tree search.',
         action = 'store_true'
     )
     parser.add_argument(
@@ -114,7 +119,7 @@ if __name__ == '__main__':
                 toc = time.time()
             else:
                 tic = time.time()
-                obj_val = tree_search(ip_instance, model.predictor, max_num_node = args.max_num_node, encoder = encoder, p0 = args.threshold_prob_0, p1 = args.threshold_prob_1)
+                obj_val = tree_search(ip_instance, model.predictor, max_num_node = args.max_num_node, random_pop = args.random_pop, encoder = encoder, p0 = args.threshold_prob_0, p1 = args.threshold_prob_1)
                 toc = time.time()
             solver_time += (toc - tic)
 

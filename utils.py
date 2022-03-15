@@ -40,7 +40,7 @@ def assign_values(ip, indicies, values):
     except gp.GurobiError as e:
         assert str(e) == 'Unable to create presolved model', str(e)
 
-def tree_search(ip, predictor, max_num_node, *predictor_args, **predictor_kwargs):
+def tree_search(ip, predictor, max_num_node, random_pop = False, *predictor_args, **predictor_kwargs):
     '''
     predictor(ip, *predictor_args, **predictor_kwargs) -> [(indicies_1, values_1), (indicies_2, values_2), ..., (indicies_M, values_M)]
     max_num_node: maximum number of nodes explored
@@ -48,10 +48,10 @@ def tree_search(ip, predictor, max_num_node, *predictor_args, **predictor_kwargs
     
     root_node = assign_values(ip, [], [])
     if type(root_node) == gp.Model:
-        nodes = deque([root_node])
+        nodes = [root_node] if random_pop else deque([root_node])
         best_val, num_node = np.inf, 0 # minimal ip.ModelSense * objval
         while nodes:
-            qip = nodes.popleft()
+            qip = nodes.pop(np.random.randint(len(nodes))) if random_pop else nodes.popleft()
             proposals = predictor(qip, *predictor_args, **predictor_kwargs)
             num_node += 1
             for (indicies, values) in proposals:
